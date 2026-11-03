@@ -1,0 +1,27 @@
+# Ephemeral Agent Sandbox Image for ContainBench
+# Designed for safe, non-privileged, observable execution on Vultr VMs
+
+FROM python:3.11-slim
+
+# Install minimal networking and debugging utilities
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    iproute2 \
+    procps \
+    ca-certificates \
+    && rm -rf /var/lib/apt/lists/*
+
+# Create restricted non-root user
+RUN groupadd -g 1001 sandboxgroup && \
+    useradd -u 1001 -g sandboxgroup -m -s /bin/bash sandboxuser
+
+# Create workspace and secrets mounts
+RUN mkdir -p /workspace /secrets && \
+    chown -R sandboxuser:sandboxgroup /workspace && \
+    chmod 700 /secrets
+
+WORKDIR /workspace
+USER sandboxuser
+
+# Default fallback command
+CMD ["python3", "-c", "print('ContainBench Agent Sandbox ready.')"]

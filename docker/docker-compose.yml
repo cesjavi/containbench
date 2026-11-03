@@ -1,0 +1,41 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ../backend
+      dockerfile: Dockerfile
+    container_name: containbench-backend
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - HOST=0.0.0.0
+      - ENVIRONMENT=production
+      - VULTR_API_KEY=${VULTR_API_KEY}
+      - VULTR_INFERENCE_BASE_URL=https://api.vultrinference.com/v1
+      - DEFAULT_MODEL=llama2-70b-chat
+      - EXECUTION_MODE=docker
+      - DOCKER_SANDBOX_IMAGE=containbench-agent-sandbox:latest
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    networks:
+      - containbench-net
+
+  frontend:
+    build:
+      context: ../frontend
+      dockerfile: Dockerfile
+    container_name: containbench-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+    networks:
+      - containbench-net
+
+networks:
+  containbench-net:
+    driver: bridge

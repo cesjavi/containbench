@@ -1,0 +1,97 @@
+from enum import Enum
+from typing import List, Dict, Any, Optional
+from pydantic import BaseModel, Field
+from datetime import datetime, timezone
+
+class VerdictType(str, Enum):
+    PASS = "PASS"
+    FAIL = "FAIL"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+class RunStatus(str, Enum):
+    CREATED = "CREATED"
+    PROVISIONING = "PROVISIONING"
+    READY = "READY"
+    RUNNING = "RUNNING"
+    EVALUATING = "EVALUATING"
+    COMPLETED = "COMPLETED"
+    FAILED = "FAILED"
+    TIMED_OUT = "TIMED_OUT"
+    INCONCLUSIVE = "INCONCLUSIVE"
+
+class PolicyConfig(BaseModel):
+    id: str
+    name: str
+    description: str
+    allow_network: bool = False
+    allowed_hosts: List[str] = Field(default_factory=list)
+    readonly_root: bool = True
+    writable_paths: List[str] = Field(default_factory=lambda: ["/workspace"])
+    cpu_limit: float = 0.5
+    memory_limit_mb: int = 256
+    pids_limit: int = 50
+    require_approval_tools: List[str] = Field(default_factory=list)
+
+class Event(BaseModel):
+    event_id: str
+    run_id: str
+    sequence: int
+    timestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    source: str # "policy-engine", "sandbox", "agent", "evaluator", "receptor"
+    type: str   # "filesystem.read", "filesystem.denied", "network.attempt", etc.
+    action: str # "read", "write", "connect", "exec", "call"
+    target: str # e.g. "/secrets/canary.env", "http://192.168.1.100:9999/exfil"
+    decision: str # "allow", "deny", "intercept", "observed"
+    scenario_id: str
+    metadata: Dict[str, Any] = Field(default_factory=dict)
+
+class Finding(BaseModel):
+    severity: str # "critical", "high", "medium", "low", "info"
+    statement: str
+    event_ids: List[str] = Field(default_factory=list)
+
+class ScenarioDefinition(BaseModel):
+    id: str
+    title: str
+    description: str
+    category: str # "secrets", "network", "injection", "filesystem", "resources", "governance"
+    severity: str # "critical", "high", "medium"
+    stimulus_type: str
+    preparation_summary: str
+    pass_criteria: str
+    fail_criteria: str
+
+class RunRequest(BaseModel):
+    scenario_id: str
+    policy_id: str = "hardened" # "baseline_permissive" or "hardened"
+    model: Optional[str] = None
+    custom_stimulus: Optional[str] = None
+
+class RunResult(BaseModel):
+    id: str
+    scenario_id: str
+    policy: PolicyConfig
+    status: RunStatus
+    created_at: str
+    completed_at: Optional[str] = None
+    verdict: Optional[VerdictType] = None
+    score: int = 0
+    timeline: List[Event] = Field(default_factory=list)
+    findings: List[Finding] = Field(default_factory=list)
+    summary: Optional[str] = None
+    recommendations: List[str] = Field(default_factory=list)
+    canary_token: Optional[str] = None
+    execution_mode: str = "simulator" # "docker" or "simulator"
+    raw_logs: Optional[str] = None
+
+class ComparisonRequest(BaseModel):
+    run_id_a: str
+    run_id_b: str
+
+class ComparisonResult(BaseModel):
+    scenario_id: str
+    run_a: RunResult
+    run_b: RunResult
+    difference_summary: str
+    containment_gain: str
+    effective_controls: List[str]

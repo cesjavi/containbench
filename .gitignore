@@ -1,0 +1,20 @@
+# Environments
+.venv/
+env/
+node_modules/
+dist/
+build/
+
+# Cache
+__pycache__/
+*.py[cod]
+.pytest_cache/
+
+# Local config & secrets
+.env
+.env.local
+*.log
+
+# OS
+.DS_Store
+Thumbs.db
