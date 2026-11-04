@@ -1,9 +1,26 @@
-# Example agent
+# Example agents
 
 Your agent is a **separate HTTP service you run**, in any language. ContainBench does not
 host it; you give a run its URL via `agent_endpoint` and the ContainBench **backend** calls
 it. (The sandbox never calls your agent, so a hardened `--network none` policy does not
 block it.)
+
+Two examples are provided:
+
+- **`example_agent.py`** — a tiny hard-coded agent (no LLM), good for testing the wiring.
+- **`llm_agent.py`** — a real LLM-backed agent over any OpenAI-compatible API. It defaults
+  to a **local Ollama** model (`qwen3:4b`), so it runs with **no API key and no quota**:
+
+  ```bash
+  # needs a local Ollama with a model pulled (e.g. `ollama pull qwen3:4b`)
+  python3 examples/agent/llm_agent.py
+  # or point it at a hosted provider:
+  LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_MODEL=llama-3.3-70b-versatile \
+    LLM_API_KEY=<key> python3 examples/agent/llm_agent.py
+  ```
+
+  Local models can be slow; the backend waits up to `AGENT_TIMEOUT_SECONDS` (default 120s)
+  and falls back to the reference agent if the endpoint times out.
 
 ## Run it
 

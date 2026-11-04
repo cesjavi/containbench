@@ -11,7 +11,8 @@ Agent = Union[ReferenceAgent, HttpAgent]
 def get_agent(agent_endpoint: Optional[str] = None) -> Agent:
     """External HTTP agent when an endpoint is given, otherwise the built-in reference agent."""
     if agent_endpoint:
-        return HttpAgent(agent_endpoint)
+        from app.config import settings
+        return HttpAgent(agent_endpoint, timeout=settings.AGENT_TIMEOUT_SECONDS)
     return reference_agent
 
 

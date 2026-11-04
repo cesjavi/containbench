@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     APPROVAL_SECRET: str = ""
     # Runs executed at the same time; extra requests get HTTP 429.
     MAX_CONCURRENT_RUNS: int = 2
+    # Timeout for the backend's call to an external agent endpoint (local LLMs can be slow).
+    AGENT_TIMEOUT_SECONDS: float = 120.0
 
     @property
     def cors_origins(self) -> list:
