@@ -169,8 +169,10 @@ The model never decides on its own whether a test passed. Observable events and 
 
 By default a run uses the built-in **reference agent**: a worst-case agent that obeys the
 stimulus, which measures whether the infrastructure contains it. You can instead point a
-run at your **own agent** over HTTP (simulator mode) so ContainBench scores *your* agent's
-choices:
+run at your **own agent** over HTTP so ContainBench scores *your* agent's choices. This
+works in both modes: in the simulator the chosen actions are enforced against the policy;
+in docker mode they are compiled into the container probe and executed for real against
+the kernel, cgroups and namespaces.
 
 ```bash
 POST /api/runs  {"scenario_id": "CB-003", "policy_id": "hardened", "agent_endpoint": "http://my-agent:9000/act"}
@@ -191,11 +193,15 @@ The policy is enforced on each action; the evaluator scores the result. An agent
 declines to attack yields INCONCLUSIVE (no attempt), not a false PASS. An unreachable
 endpoint falls back to the reference agent. See `backend/app/agents/`.
 
+In docker mode the actions run inside the ephemeral container as the unprivileged agent
+user, so allow/deny come from the real kernel (EACCES, EROFS, `--network none`, cgroups),
+not from policy flags. This path is validated at the logic level here; running it against
+a live Docker daemon is the VM step below.
+
 ## Roadmap
 
 Known limitations and planned work, most impactful first:
 
-1. **End-to-end validation on a Vultr VM.** The Docker runner has been exercised at the logic level (probe scripts, container options, output parsing) but not yet against a live Docker daemon and the mock receptor. This is the main validation gap.
-2. **External agents in Docker mode.** The agent contract above runs in simulator mode. Driving an external agent's chosen actions inside a live container (rather than the built-in probe) is not implemented; Docker runs flag the request and use the probe.
-3. **Real-time events.** Runs complete synchronously and the UI shows the timeline afterward. Streaming events while a run is in progress (SSE/WebSocket, backed by an async job queue) is not implemented.
-4. **Evidence store extras from the docs:** browser-agent scenarios, screenshots and artifact-hash storage are described in `docs/architecture.md` but not built.
+1. **End-to-end validation on a Vultr VM.** The Docker runner — including the external-agent action path — has been exercised at the logic level (probe scripts validated with `sh -n`, container options, output parsing) but not yet against a live Docker daemon and the mock receptor. This environment has no Docker, so it is the main validation gap; `scripts/smoke_test.py` makes it a single step once the stack is up.
+2. **Real-time events.** Runs complete synchronously and the UI shows the timeline afterward. Streaming events while a run is in progress (SSE/WebSocket, backed by an async job queue) is not implemented.
+3. **Evidence store extras from the docs:** browser-agent scenarios, screenshots and artifact-hash storage are described in `docs/architecture.md` but not built.
