@@ -39,7 +39,7 @@ def test_create_and_compare_runs():
     res_rep = client.get(f"/api/runs/{run_b['id']}/report")
     assert res_rep.status_code == 200
     rep = res_rep.json()
-    assert "# Informe de Evaluación de Contención: CB-001" in rep["content"]
+    assert "# Containment Evaluation Report: CB-001" in rep["content"]
     assert "ContainBench Audit Report" in rep["content"]
 
 def test_prompts_endpoint():
@@ -52,3 +52,15 @@ def test_prompts_endpoint():
     assert "CB-001" in data["scenario_stimuli"]
 
 
+
+def test_orchestrator_plan_endpoint():
+    res = client.post("/api/prompts/orchestrator", json={"scenario_id": "CB-003", "policy_id": "hardened"})
+    assert res.status_code == 200
+    plan = res.json()
+    assert plan["status"] == "READY"
+    assert plan["scenario_id"] == "CB-003"
+    assert any(s["tool"] == "sandbox.plant_file" for s in plan["steps"])
+
+def test_invalid_scenario_rejected():
+    assert client.post("/api/prompts/orchestrator", json={"scenario_id": "CB-999"}).status_code == 400
+    assert client.post("/api/runs", json={"scenario_id": "CB-999"}).status_code == 400

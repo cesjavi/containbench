@@ -1,65 +1,64 @@
-# Product brief
+# Product Brief
 
-## Usuario objetivo
+## Target Users
 
-- Equipos que construyen agentes con acceso a herramientas.
-- Responsables de plataforma, AppSec y DevSecOps.
-- Empresas que necesitan evidencia antes de habilitar autonomía.
+- Teams building agents with access to tools.
+- Platform, AppSec and DevSecOps owners.
+- Companies that need evidence before enabling autonomy.
 
-## Trabajo que resuelve
+## Job to Be Done
 
-Antes de desplegar una versión de un agente, el equipo necesita comprobar que sus límites de filesystem, red, secretos, recursos y aprobaciones continúan funcionando.
+Before deploying a new version of an agent, the team needs to confirm that its filesystem, network, secrets, resource and approval limits still work.
 
-## Propuesta de valor
+## Value Proposition
 
-ContainBench convierte controles abstractos en experimentos reproducibles. Ejecuta ataques seguros dentro de infraestructura desechable y muestra exactamente qué ocurrió.
+ContainBench turns abstract controls into reproducible experiments. It runs safe attacks inside disposable infrastructure and shows exactly what happened.
 
-## Alcance del MVP
+## MVP Scope
 
-### Incluido
+### Included
 
-- Aplicación web con creación y consulta de ejecuciones.
-- Un agente de referencia con herramientas de shell y navegador.
-- Sandboxes Docker efímeros en una VM de Vultr.
-- Inferencia mediante Vultr Serverless Inference.
-- Seis escenarios incorporados.
-- Políticas configurables de red, archivos, recursos y aprobación.
-- Eventos en tiempo real e informe final.
-- Comparación entre dos ejecuciones o políticas.
+- Web app to create and review runs.
+- A reference agent with shell and browser tools.
+- Ephemeral Docker sandboxes on a Vultr VM.
+- Inference through Vultr Serverless Inference.
+- Six built-in scenarios.
+- Configurable network, file, secret, resource and approval policies.
+- Real-time events and a final report.
+- Comparison between two runs or policies.
 
-### Fuera de alcance
+### Out of Scope
 
-- Certificación formal de seguridad.
-- Ejecución de malware real.
-- Ataques contra servicios públicos o de terceros.
-- Compatibilidad universal con todos los frameworks de agentes.
-- Garantía de detección de todas las vulnerabilidades.
+- Formal security certification.
+- Running real malware.
+- Attacks against public or third-party services.
+- Universal compatibility with every agent framework.
+- A guarantee of detecting every vulnerability.
 
-## Historia de demostración
+## Demo Story
 
-Se ejecuta el mismo agente con dos políticas:
+The same agent is run under two policies:
 
-1. **Baseline permisiva:** el agente lee un secreto señuelo y alcanza un receptor de red simulado.
-2. **Política endurecida:** el acceso al secreto y la conexión quedan bloqueados y registrados.
+1. **Permissive baseline:** the agent reads a decoy secret and reaches a simulated network receptor.
+2. **Hardened policy:** access to the secret and the connection are blocked and recorded.
 
-La interfaz compara ambas líneas de tiempo y explica qué control redujo el radio de daño.
+The UI compares both timelines and explains which control reduced the blast radius.
 
-## Métricas
+## Metrics
 
-- Escenarios ejecutados de forma reproducible.
-- Controles que bloquearon el comportamiento esperado.
-- Intentos peligrosos observados.
-- Datos señuelo expuestos o exfiltrados.
-- Tiempo hasta contención.
-- CPU, memoria, procesos y tráfico utilizados.
-- Acciones sensibles que requirieron aprobación.
+- Scenarios run reproducibly.
+- Controls that blocked the expected behavior.
+- Dangerous attempts observed.
+- Decoy data exposed or exfiltrated.
+- Time to containment.
+- CPU, memory, processes and traffic used.
+- Sensitive actions that required approval.
 
-## Criterios de finalización
+## Definition of Done
 
-- Una ejecución completa se inicia desde el navegador.
-- El sandbox no comparte secretos ni filesystem con el orquestador.
-- Los seis escenarios producen un resultado objetivo.
-- El reporte enlaza cada conclusión con eventos concretos.
-- Un timeout o fallo del modelo no deja recursos activos.
-- La demo funciona desde una URL pública.
-
+- A complete run can be started from the browser.
+- The sandbox shares no secrets or filesystem with the orchestrator.
+- All six scenarios produce an objective result.
+- The report links every conclusion to concrete events.
+- A timeout or model failure leaves no resources running.
+- The demo works from a public URL.

@@ -25,6 +25,7 @@ export interface PolicyConfig {
   allow_network: boolean;
   allowed_hosts: string[];
   readonly_root: boolean;
+  protect_secrets: boolean;
   writable_paths: string[];
   cpu_limit: number;
   memory_limit_mb: number;
@@ -71,3 +72,16 @@ export interface ComparisonResult {
   effective_controls: string[];
 }
 
+
+export interface ApprovalRequest {
+  id: string;
+  run_id: string;
+  scenario_id: string;
+  tool: string;
+  arguments: Record<string, any>;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  created_at: string;
+  decided_by?: string;
+  decided_at?: string;
+  reason?: string;
+}

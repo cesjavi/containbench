@@ -8,7 +8,10 @@ from .schemas import (
     RunRequest,
     RunResult,
     ComparisonRequest,
-    ComparisonResult
+    ComparisonResult,
+    ApprovalStatus,
+    ApprovalRequest,
+    ApprovalDecision
 )
 
 __all__ = [
@@ -21,6 +24,9 @@ __all__ = [
     "RunRequest",
     "RunResult",
     "ComparisonRequest",
-    "ComparisonResult"
+    "ComparisonResult",
+    "ApprovalStatus",
+    "ApprovalRequest",
+    "ApprovalDecision"
 ]
 

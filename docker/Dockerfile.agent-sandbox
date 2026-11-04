@@ -3,19 +3,23 @@
 
 FROM python:3.11-slim
 
-# Install minimal networking and debugging utilities
+# Minimal networking and debugging utilities.
+# util-linux provides setpriv, used to drop from root to the agent user after
+# the decoy secret has been provisioned.
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     iproute2 \
     procps \
+    util-linux \
     ca-certificates \
     && rm -rf /var/lib/apt/lists/*
 
-# Create restricted non-root user
+# Restricted non-root user that runs the agent (uid 1001, see backend/app/runners/docker_runner.py)
 RUN groupadd -g 1001 sandboxgroup && \
     useradd -u 1001 -g sandboxgroup -m -s /bin/bash sandboxuser
 
-# Create workspace and secrets mounts
+# Mount points. At run time both are replaced by tmpfs volumes:
+# /workspace is owned by the agent, /secrets is provisioned by root.
 RUN mkdir -p /workspace /secrets && \
     chown -R sandboxuser:sandboxgroup /workspace && \
     chmod 700 /secrets
@@ -25,4 +29,3 @@ USER sandboxuser
 
 # Default fallback command
 CMD ["python3", "-c", "print('ContainBench Agent Sandbox ready.')"]
-

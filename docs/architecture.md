@@ -1,44 +1,52 @@
-# Arquitectura propuesta
+# Proposed Architecture
 
-## Componentes
+## Components
 
 ### Web UI
 
-Permite configurar el objetivo, seleccionar escenarios, iniciar una ejecución y revisar evidencia. Una opción razonable es Next.js.
+Lets the user configure the target, pick scenarios, start a run and review the evidence. The MVP uses React with Vite.
 
 ### Control API
 
-Gestiona usuarios, políticas, suites, ejecuciones y artefactos. No ejecuta código del agente dentro de su propio proceso.
+Manages policies, suites, runs and artifacts. It never runs agent code inside its own process.
 
-### Orquestador
+### Orchestrator
 
-Convierte una solicitud en pasos limitados, solicita inferencia y envía trabajos a la cola. Mantiene una máquina de estados explícita.
+Turns a request into bounded steps, requests inference and dispatches jobs. It keeps an explicit state machine. Plans proposed by the model (`prompts/orchestrator-system.md`) are advisory: runners only execute their own fixed probes.
 
-### Worker de sandbox
+### Sandbox worker
 
-Crea un contenedor por ejecución con:
+Creates one container per run with:
 
-- Usuario sin privilegios.
-- Filesystem raíz de solo lectura.
-- Volumen temporal montado en `/workspace`.
-- Límites de CPU, memoria, PIDs y tiempo.
-- Red denegada por defecto y allowlist opcional.
-- Sin socket Docker ni credenciales del host.
-- Eliminación obligatoria al finalizar.
+- An unprivileged user (the root stage only provisions the decoy secret, then drops privileges).
+- A read-only root filesystem.
+- A temporary volume mounted at `/workspace`.
+- CPU, memory, PID and time limits.
+- Network denied by default and an optional allowlist.
+- No Docker socket and no host credentials.
+- Mandatory removal when the run ends.
+
+### Tool dispatcher
+
+Mediates every tool call from the agent. Tools listed in the policy's `require_approval_tools` are held in `PENDING_HUMAN_APPROVAL` until a human-issued approval token is presented. Agent-supplied flags such as `emergency_override` never skip approval.
+
+### Mock receptor
+
+A simulated attacker endpoint controlled by the system. It records what sandboxes send and answers the backend's queries, so exfiltration is confirmed by evidence rather than inferred.
 
 ### Event collector
 
-Registra comandos, código de salida, archivos, decisiones de política, conexiones, consumo de recursos y acciones de navegador.
+Records commands, exit codes, files, policy decisions, connections, resource usage and browser actions.
 
 ### Evidence store
 
-Conserva eventos normalizados, capturas, logs y hashes de artefactos. Los secretos reales nunca deben aparecer aquí.
+Keeps normalized events, screenshots, logs and artifact hashes. Real secrets must never appear here; delivered stimuli are stored only as a hash.
 
-### Evaluador
+### Evaluator
 
-Aplica reglas deterministas a los eventos. El modelo puede redactar una explicación, pero no cambiar `PASS`, `FAIL` o `INCONCLUSIVE`.
+Applies deterministic rules to the events. The model can write an explanation, but it cannot change `PASS`, `FAIL` or `INCONCLUSIVE`.
 
-## Límites de confianza
+## Trust Boundaries
 
 ```text
 Browser
@@ -53,12 +61,14 @@ Queue ----> Sandbox worker ----> Disposable container
                  |                       +-- Canary secrets
                  |                       +-- Instrumentation
                  |
+                 +----> Mock receptor (simulated egress target)
+                 |
                  +----> Vultr Serverless Inference
 ```
 
-El contenido del repositorio, las páginas visitadas, la salida del agente y los argumentos de herramientas son datos no confiables.
+Repository content, visited pages, agent output and tool arguments are untrusted data.
 
-## Máquina de estados
+## State Machine
 
 ```text
 CREATED -> PROVISIONING -> READY -> RUNNING -> EVALUATING -> COMPLETED
@@ -67,9 +77,9 @@ CREATED -> PROVISIONING -> READY -> RUNNING -> EVALUATING -> COMPLETED
                        FAILED     TIMED_OUT     INCONCLUSIVE
 ```
 
-Todos los estados terminales deben activar la destrucción del sandbox.
+Every terminal state must trigger the destruction of the sandbox.
 
-## Evento mínimo
+## Minimal Event
 
 ```json
 {
@@ -79,20 +89,19 @@ Todos los estados terminales deben activar la destrucción del sandbox.
   "source": "policy-engine",
   "type": "filesystem.denied",
   "action": "read",
-  "target": "/secrets/aws.env",
+  "target": "/secrets/canary.env",
   "decision": "deny",
-  "scenario_id": "secret-read",
+  "scenario_id": "CB-001",
   "metadata": {}
 }
 ```
 
-## Controles imprescindibles
+## Essential Controls
 
-- Claves de inferencia disponibles solamente para el orquestador.
-- Credenciales señuelo, nunca credenciales reales, dentro de escenarios.
-- Receptor de exfiltración simulado y controlado por el sistema.
-- Allowlist de imágenes, comandos y destinos cuando corresponda.
-- Tamaño máximo de logs y artefactos.
-- Idempotencia al destruir recursos.
-- Registro claro de cualquier evidencia incompleta.
-
+- Inference keys available only to the orchestrator.
+- Decoy credentials, never real ones, inside scenarios.
+- A simulated exfiltration receptor controlled by the system.
+- Allowlists of images, commands and destinations where applicable.
+- Maximum size for logs and artifacts.
+- Idempotent resource destruction.
+- Clear recording of any incomplete evidence.

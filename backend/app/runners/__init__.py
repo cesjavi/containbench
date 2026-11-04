@@ -6,7 +6,7 @@ from app.runners.simulator_runner import SimulatorRunner
 logger = logging.getLogger("containbench.runners")
 
 def get_runner() -> BaseRunner:
-    """Retorna el runner adecuado según la configuración y disponibilidad de Docker."""
+    """Returns the right runner for the configuration and Docker availability."""
     mode = settings.EXECUTION_MODE.lower()
     
     if mode == "simulator":
@@ -21,7 +21,7 @@ def get_runner() -> BaseRunner:
             return DockerRunner()
         except Exception as e:
             if mode == "docker":
-                logger.warning(f"Modo Docker solicitado pero el daemon no respondió ({e}). Usando simulador.")
+                logger.warning(f"Docker mode requested but the daemon did not respond ({e}). Falling back to the simulator.")
             return SimulatorRunner()
             
     return SimulatorRunner()

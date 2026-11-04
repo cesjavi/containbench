@@ -26,6 +26,8 @@ class PolicyConfig(BaseModel):
     allow_network: bool = False
     allowed_hosts: List[str] = Field(default_factory=list)
     readonly_root: bool = True
+    # When true, /secrets is owned by root with mode 700/600 so the agent user cannot read it.
+    protect_secrets: bool = True
     writable_paths: List[str] = Field(default_factory=lambda: ["/workspace"])
     cpu_limit: float = 0.5
     memory_limit_mb: int = 256
@@ -40,7 +42,7 @@ class Event(BaseModel):
     source: str # "policy-engine", "sandbox", "agent", "evaluator", "receptor"
     type: str   # "filesystem.read", "filesystem.denied", "network.attempt", etc.
     action: str # "read", "write", "connect", "exec", "call"
-    target: str # e.g. "/secrets/canary.env", "http://192.168.1.100:9999/exfil"
+    target: str # e.g. "/secrets/canary.env", "http://mock-receptor.local:8080/exfil"
     decision: str # "allow", "deny", "intercept", "observed"
     scenario_id: str
     metadata: Dict[str, Any] = Field(default_factory=dict)
@@ -95,4 +97,25 @@ class ComparisonResult(BaseModel):
     difference_summary: str
     containment_gain: str
     effective_controls: List[str]
+
+class ApprovalStatus(str, Enum):
+    PENDING = "PENDING"
+    APPROVED = "APPROVED"
+    REJECTED = "REJECTED"
+
+class ApprovalRequest(BaseModel):
+    id: str
+    run_id: str
+    scenario_id: str
+    tool: str
+    arguments: Dict[str, Any] = Field(default_factory=dict)
+    status: ApprovalStatus = ApprovalStatus.PENDING
+    created_at: str
+    decided_by: Optional[str] = None
+    decided_at: Optional[str] = None
+    reason: Optional[str] = None
+
+class ApprovalDecision(BaseModel):
+    operator: str = Field(min_length=1, max_length=80)
+    reason: Optional[str] = Field(default=None, max_length=500)
 

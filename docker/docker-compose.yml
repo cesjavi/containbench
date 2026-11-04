@@ -1,25 +1,58 @@
-version: '3.8'
-
 services:
+  # Builds the sandbox image used by the backend for every run, then exits.
+  agent-sandbox-image:
+    build:
+      context: .
+      dockerfile: Dockerfile.agent-sandbox
+    image: containbench-agent-sandbox:latest
+    command: ["true"]
+    restart: "no"
+
+  # Simulated exfiltration endpoint (CB-002, CB-003). Only reachable from sandboxes
+  # whose policy allows network access; hardened sandboxes run with --network none.
+  mock-receptor:
+    build:
+      context: ./mock-receptor
+    container_name: containbench-mock-receptor
+    restart: unless-stopped
+    networks:
+      containbench-net:
+        aliases:
+          - mock-receptor.local
+
   backend:
     build:
       context: ../backend
       dockerfile: Dockerfile
     container_name: containbench-backend
     restart: unless-stopped
+    # Only reachable from the VM itself; the public entry point is the frontend (nginx + basic auth).
     ports:
-      - "8000:8000"
+      - "127.0.0.1:8000:8000"
     environment:
       - PORT=8000
       - HOST=0.0.0.0
       - ENVIRONMENT=production
       - VULTR_API_KEY=${VULTR_API_KEY}
       - VULTR_INFERENCE_BASE_URL=https://api.vultrinference.com/v1
-      - DEFAULT_MODEL=llama2-70b-chat
+      # "auto" selects the best available model from Vultr's catalog
+      - DEFAULT_MODEL=${DEFAULT_MODEL:-auto}
       - EXECUTION_MODE=docker
       - DOCKER_SANDBOX_IMAGE=containbench-agent-sandbox:latest
+      - DOCKER_SANDBOX_NETWORK=containbench-net
+      - RECEPTOR_QUERY_URL=http://mock-receptor.local:8080
+      - API_KEY=${CONTAINBENCH_API_KEY:?Set CONTAINBENCH_API_KEY (letters and digits)}
+      - APPROVAL_SECRET=${APPROVAL_SECRET:-}
+      - MAX_CONCURRENT_RUNS=2
+    # The Docker socket gives the backend root-equivalent control of the VM. Keep the
+    # backend private (see ports above) and never expose it without the API key.
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
+      # Runs and approvals survive restarts (SQLite)
+      - containbench-data:/app/data
+    depends_on:
+      - agent-sandbox-image
+      - mock-receptor
     networks:
       - containbench-net
 
@@ -31,12 +64,21 @@ services:
     restart: unless-stopped
     ports:
       - "3000:80"
+    environment:
+      - BASIC_AUTH_USER=${BASIC_AUTH_USER:-admin}
+      # When empty, a random password is generated and printed in the frontend logs.
+      - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-}
+      - CONTAINBENCH_API_KEY=${CONTAINBENCH_API_KEY}
     depends_on:
       - backend
     networks:
       - containbench-net
 
+volumes:
+  containbench-data:
+
 networks:
   containbench-net:
+    # Fixed name so the backend can attach permissive sandboxes to it.
+    name: containbench-net
     driver: bridge
-
