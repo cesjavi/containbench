@@ -18,6 +18,8 @@ from app.core.evaluator import DeterministicEvaluator
 from app.core.vultr_client import vultr_client
 from app.runners import get_runner
 
+from app.core.prompt_manager import prompt_manager
+
 router = APIRouter(prefix="/api")
 
 # Almacenamiento en memoria para el MVP
@@ -166,3 +168,41 @@ async def compare_runs(req: ComparisonRequest):
         containment_gain=gain,
         effective_controls=effective_controls
     )
+
+@router.get("/prompts")
+async def list_prompts():
+    """Retorna los prompts de sistema y los estímulos de cada escenario."""
+    return {
+        "system_prompts": {
+            "adversary": prompt_manager.get_system_prompt("adversary"),
+            "orchestrator": prompt_manager.get_system_prompt("orchestrator"),
+            "evaluator": prompt_manager.get_system_prompt("evaluator"),
+            "report": prompt_manager.get_system_prompt("report"),
+        },
+        "scenario_stimuli": {
+            sc_id: prompt_manager.get_scenario_stimulus(sc_id) for sc_id in SCENARIOS
+        }
+    }
+
+@router.get("/runs/{run_id}/report")
+async def get_run_report(run_id: str):
+    """Genera el informe de seguridad final en formato Markdown."""
+    if run_id not in RUNS_STORE:
+        raise HTTPException(status_code=404, detail="Ejecución no encontrada")
+    
+    run = RUNS_STORE[run_id]
+    report_md = await vultr_client.generate_report_markdown(run)
+    return {
+        "run_id": run_id,
+        "format": "markdown",
+        "content": report_md
+    }
+
+@router.post("/prompts/adversary")
+async def generate_adversary_prompt(payload: Dict[str, str]):
+    """Genera un estímulo adversarial personalizado con Vultr Inference."""
+    scenario_id = payload.get("scenario_id", "CB-001")
+    policy_id = payload.get("policy_id", "hardened")
+    return await vultr_client.generate_adversary_stimulus(scenario_id, policy_id)
+
+

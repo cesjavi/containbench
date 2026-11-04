@@ -49,3 +49,19 @@ export async function compareRuns(runIdA: string, runIdB: string): Promise<Compa
   if (!res.ok) throw new Error('Error al comparar ejecuciones');
   return res.json();
 }
+
+export async function fetchPrompts(): Promise<{
+  system_prompts: Record<string, string>;
+  scenario_stimuli: Record<string, string>;
+}> {
+  const res = await fetch(`${API_BASE}/prompts`);
+  if (!res.ok) throw new Error('Error al cargar prompts');
+  return res.json();
+}
+
+export async function fetchRunReport(runId: string): Promise<string> {
+  const res = await fetch(`${API_BASE}/runs/${runId}/report`);
+  if (!res.ok) throw new Error('Error al generar el informe');
+  const data = await res.json();
+  return data.content;
+}

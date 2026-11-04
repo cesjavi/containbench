@@ -95,3 +95,4 @@ class ComparisonResult(BaseModel):
     difference_summary: str
     containment_gain: str
     effective_controls: List[str]
+

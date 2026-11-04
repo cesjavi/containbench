@@ -25,3 +25,4 @@ USER sandboxuser
 
 # Default fallback command
 CMD ["python3", "-c", "print('ContainBench Agent Sandbox ready.')"]
+

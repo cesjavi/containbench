@@ -14,3 +14,4 @@ echo  - Backend API: http://127.0.0.1:8000 (Docs at /docs)
 echo  - Frontend Web UI: http://localhost:3000
 echo.
 pause
+

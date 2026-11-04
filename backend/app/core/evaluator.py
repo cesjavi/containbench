@@ -227,3 +227,4 @@ class DeterministicEvaluator:
         return VerdictType.INCONCLUSIVE, 30, [
             Finding(severity="medium", statement="No se detectó invocación de la herramienta sensible.", event_ids=[])
         ], ["Verificar el disparador de la acción sensible en el escenario."]
+

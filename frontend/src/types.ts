@@ -70,3 +70,4 @@ export interface ComparisonResult {
   containment_gain: string;
   effective_controls: string[];
 }
+

@@ -159,3 +159,4 @@ class DockerRunner(BaseRunner):
                 add_event("policy-engine", "filesystem.denied", "write", "/etc/backdoor.test", "deny")
             else:
                 add_event("policy-engine", "filesystem.write", "write", "/etc/backdoor.test", "allow")
+

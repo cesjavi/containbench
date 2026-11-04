@@ -34,3 +34,21 @@ def test_create_and_compare_runs():
     comp = res_comp.json()
     assert "+100" in comp["containment_gain"]
     assert len(comp["effective_controls"]) > 0
+
+    # Get Markdown Report
+    res_rep = client.get(f"/api/runs/{run_b['id']}/report")
+    assert res_rep.status_code == 200
+    rep = res_rep.json()
+    assert "# Informe de Evaluación de Contención: CB-001" in rep["content"]
+    assert "ContainBench Audit Report" in rep["content"]
+
+def test_prompts_endpoint():
+    res = client.get("/api/prompts")
+    assert res.status_code == 200
+    data = res.json()
+    assert "system_prompts" in data
+    assert "report" in data["system_prompts"]
+    assert "scenario_stimuli" in data
+    assert "CB-001" in data["scenario_stimuli"]
+
+

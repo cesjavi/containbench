@@ -19,3 +19,4 @@ class BaseRunner(ABC):
         (lista de eventos normalizados, logs crudos de ejecución)
         """
         pass
+

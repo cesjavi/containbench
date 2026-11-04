@@ -11,22 +11,41 @@ import {
   Activity,
   Layers,
   CheckCircle2,
-  XCircle,
-  HelpCircle,
   Cpu,
-  Lock,
-  ArrowRight
+  FileText,
+  FileCode,
+  Download,
+  Copy,
+  Check,
+  Sparkles
 } from 'lucide-react';
-import { fetchScenarios, fetchPolicies, fetchRuns, createRun, compareRuns, fetchVultrStatus } from './api';
-import { ScenarioDefinition, PolicyConfig, RunResult, ComparisonResult, Event } from './types';
+import {
+  fetchScenarios,
+  fetchPolicies,
+  fetchRuns,
+  createRun,
+  compareRuns,
+  fetchVultrStatus,
+  fetchPrompts,
+  fetchRunReport
+} from './api';
+import { ScenarioDefinition, PolicyConfig, RunResult, ComparisonResult } from './types';
 
 export default function App() {
   const [scenarios, setScenarios] = useState<ScenarioDefinition[]>([]);
   const [policies, setPolicies] = useState<PolicyConfig[]>([]);
   const [runs, setRuns] = useState<RunResult[]>([]);
   const [selectedRun, setSelectedRun] = useState<RunResult | null>(null);
-  const [activeTab, setActiveTab] = useState<'scenarios' | 'runs' | 'compare'>('scenarios');
+  const [activeTab, setActiveTab] = useState<'scenarios' | 'runs' | 'compare' | 'prompts'>('scenarios');
   const [vultrStatus, setVultrStatus] = useState<{ connected: boolean; status: string } | null>(null);
+
+  // Prompts state
+  const [promptsData, setPromptsData] = useState<{
+    system_prompts: Record<string, string>;
+    scenario_stimuli: Record<string, string>;
+  } | null>(null);
+  const [selectedPromptKey, setSelectedPromptKey] = useState<string>('report');
+  const [copied, setCopied] = useState(false);
 
   // Execution modal state
   const [running, setRunning] = useState(false);
@@ -45,16 +64,18 @@ export default function App() {
 
   const loadData = async () => {
     try {
-      const [sc, pol, r, v] = await Promise.all([
+      const [sc, pol, r, v, pr] = await Promise.all([
         fetchScenarios(),
         fetchPolicies(),
         fetchRuns(),
-        fetchVultrStatus()
+        fetchVultrStatus(),
+        fetchPrompts()
       ]);
       setScenarios(sc);
       setPolicies(pol);
       setRuns(r);
       setVultrStatus(v);
+      setPromptsData(pr);
       if (r.length > 0 && !selectedRun) {
         setSelectedRun(r[0]);
       }
@@ -95,9 +116,7 @@ export default function App() {
   const runQuickDemoAB = async (scenarioId: string = 'CB-001') => {
     setRunning(true);
     try {
-      // Run permissive
       const runA = await createRun(scenarioId, 'baseline_permissive');
-      // Run hardened
       const runB = await createRun(scenarioId, 'hardened');
       setRuns(prev => [runB, runA, ...prev]);
       setCompRunA(runA.id);
@@ -110,6 +129,28 @@ export default function App() {
     } finally {
       setRunning(false);
     }
+  };
+
+  const downloadReport = async (runId: string) => {
+    try {
+      const markdown = await fetchRunReport(runId);
+      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `containbench-audit-${runId}.md`);
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      alert("Error descargando el informe: " + err);
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
   };
 
   return (
@@ -157,10 +198,10 @@ export default function App() {
 
       {/* Main Tabs Navigation */}
       <div className="border-b border-slate-800/80 bg-slate-900/30 px-6">
-        <div className="flex gap-6">
+        <div className="flex gap-6 overflow-x-auto">
           <button
             onClick={() => setActiveTab('scenarios')}
-            className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
+            className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap ${
               activeTab === 'scenarios'
                 ? 'border-teal-400 text-teal-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -171,7 +212,7 @@ export default function App() {
           </button>
           <button
             onClick={() => setActiveTab('runs')}
-            className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
+            className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap ${
               activeTab === 'runs'
                 ? 'border-teal-400 text-teal-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
@@ -182,14 +223,25 @@ export default function App() {
           </button>
           <button
             onClick={() => setActiveTab('compare')}
-            className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition ${
+            className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap ${
               activeTab === 'compare'
                 ? 'border-teal-400 text-teal-400'
                 : 'border-transparent text-slate-400 hover:text-slate-200'
             }`}
           >
             <ShieldCheck className="h-4 w-4" />
-            Comparador A/B (Historia de Demostración)
+            Comparador A/B (Demo Story)
+          </button>
+          <button
+            onClick={() => setActiveTab('prompts')}
+            className={`py-3 text-sm font-semibold flex items-center gap-2 border-b-2 transition whitespace-nowrap ${
+              activeTab === 'prompts'
+                ? 'border-teal-400 text-teal-400'
+                : 'border-transparent text-slate-400 hover:text-slate-200'
+            }`}
+          >
+            <FileCode className="h-4 w-4" />
+            Ingeniería de Prompts & Estímulos
           </button>
         </div>
       </div>
@@ -338,9 +390,18 @@ export default function App() {
                         </p>
                       </div>
 
-                      <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-4">
+                        <button
+                          onClick={() => downloadReport(selectedRun.id)}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 text-xs font-semibold transition"
+                          title="Generar y descargar informe de auditoría Markdown"
+                        >
+                          <Download className="h-3.5 w-3.5" />
+                          Descargar Informe MD
+                        </button>
+
                         <div className="text-right">
-                          <div className="text-xs text-slate-400">Puntaje Determinista</div>
+                          <div className="text-xs text-slate-400">Puntaje</div>
                           <div className="text-2xl font-black font-mono tracking-tight text-white">
                             {selectedRun.score}
                             <span className="text-sm font-normal text-slate-500">/100</span>
@@ -605,6 +666,95 @@ export default function App() {
                 </div>
               </div>
             )}
+          </div>
+        )}
+
+        {/* TAB 4: PROMPTS & STIMULI EXPLORER */}
+        {activeTab === 'prompts' && promptsData && (
+          <div className="space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold tracking-tight text-white">Ingeniería de Prompts & Estímulos</h1>
+              <p className="text-slate-400 text-sm mt-1">
+                Inspecciona los prompts de sistema y los estímulos adversariales aplicados para asegurar pruebas reproducibles y deterministas.
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+              {/* Left Selector */}
+              <div className="lg:col-span-4 space-y-4">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-teal-400 mb-2">Prompts de Sistema</h3>
+                  <div className="space-y-1.5">
+                    {[
+                      { key: 'report', title: 'Generador de Informe', desc: 'prompts/report-system.md' },
+                      { key: 'evaluator', title: 'Evaluador Explicativo', desc: 'prompts/evaluator-system.md' },
+                      { key: 'adversary', title: 'Generador Adversarial', desc: 'prompts/adversary-system.md' },
+                      { key: 'orchestrator', title: 'Planificador de Sandbox', desc: 'prompts/orchestrator-system.md' }
+                    ].map(p => (
+                      <button
+                        key={p.key}
+                        onClick={() => setSelectedPromptKey(p.key)}
+                        className={`w-full text-left p-3 rounded-xl border transition ${
+                          selectedPromptKey === p.key
+                            ? 'bg-slate-800 border-teal-500 text-white'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="font-semibold text-xs text-slate-200">{p.title}</div>
+                        <div className="font-mono text-[10px] text-slate-500 mt-0.5">{p.desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-amber-400 mb-2">Estímulos Adversariales (Por Escenario)</h3>
+                  <div className="space-y-1.5">
+                    {['CB-001', 'CB-002', 'CB-003', 'CB-004', 'CB-005', 'CB-006'].map(scId => (
+                      <button
+                        key={scId}
+                        onClick={() => setSelectedPromptKey(scId)}
+                        className={`w-full text-left p-3 rounded-xl border transition ${
+                          selectedPromptKey === scId
+                            ? 'bg-slate-800 border-amber-500 text-white'
+                            : 'bg-slate-900/60 border-slate-800 text-slate-400 hover:border-slate-700'
+                        }`}
+                      >
+                        <div className="font-semibold text-xs text-slate-200">{scId}: {scenarios.find(s => s.id === scId)?.title || scId}</div>
+                        <div className="font-mono text-[10px] text-slate-500 mt-0.5">prompts/scenarios/{scId.toLowerCase()}-*.md</div>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </div>
+
+              {/* Right Content Viewer */}
+              <div className="lg:col-span-8">
+                <div className="p-6 rounded-2xl bg-slate-900 border border-slate-800 flex flex-col h-full">
+                  <div className="flex items-center justify-between border-b border-slate-800 pb-3 mb-4">
+                    <div>
+                      <span className="font-mono text-xs text-teal-400 uppercase font-bold">{selectedPromptKey}</span>
+                      <h3 className="text-lg font-bold text-white">Contenido del Prompt / Estímulo</h3>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        const content = promptsData.system_prompts[selectedPromptKey] || promptsData.scenario_stimuli[selectedPromptKey] || '';
+                        copyToClipboard(content);
+                      }}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-200 text-xs font-semibold border border-slate-700 transition"
+                    >
+                      {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+                      {copied ? '¡Copiado!' : 'Copiar Texto'}
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-auto bg-slate-950 p-4 rounded-xl border border-slate-800 font-mono text-xs text-slate-300 leading-relaxed whitespace-pre-wrap max-h-[600px]">
+                    {promptsData.system_prompts[selectedPromptKey] || promptsData.scenario_stimuli[selectedPromptKey] || 'Prompt no disponible.'}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
         )}
       </main>

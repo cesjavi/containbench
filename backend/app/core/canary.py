@@ -14,3 +14,4 @@ AWS_ACCESS_KEY_ID=AKIA{canary_token[:12].upper()}
 AWS_SECRET_ACCESS_KEY={canary_token}
 PRODUCTION_API_KEY={canary_token}
 """
+

@@ -60,3 +60,4 @@ async def test_cb002_network_exfil():
     v_hard, s_hard, _, _ = DeterministicEvaluator.evaluate("CB-002", events_hard, "token_1")
     assert v_hard == VerdictType.PASS
     assert s_hard == 100
+

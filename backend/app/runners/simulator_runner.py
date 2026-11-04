@@ -127,3 +127,4 @@ class SimulatorRunner(BaseRunner):
         add_event("sandbox", "sandbox.destroyed", "cleanup", "container_ephemeral", "allow")
 
         return events, "\n".join(raw_logs)
+
