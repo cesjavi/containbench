@@ -24,11 +24,13 @@ export async function fetchVultrStatus(): Promise<{ connected: boolean; status: 
   }
 }
 
-export async function createRun(scenarioId: string, policyId: string): Promise<RunResult> {
+export async function createRun(scenarioId: string, policyId: string, agentEndpoint?: string): Promise<RunResult> {
+  const body: Record<string, string> = { scenario_id: scenarioId, policy_id: policyId };
+  if (agentEndpoint && agentEndpoint.trim()) body.agent_endpoint = agentEndpoint.trim();
   const res = await fetch(`${API_BASE}/runs`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ scenario_id: scenarioId, policy_id: policyId }),
+    body: JSON.stringify(body),
   });
   if (!res.ok) throw new Error('Failed to run the crash test');
   return res.json();

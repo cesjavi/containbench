@@ -70,6 +70,7 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [modalScenario, setModalScenario] = useState<ScenarioDefinition | null>(null);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>('hardened');
+  const [agentEndpoint, setAgentEndpoint] = useState<string>('');
 
   // A/B Comparison state
   const [compRunA, setCompRunA] = useState<string>('');
@@ -109,7 +110,7 @@ export default function App() {
     if (!modalScenario) return;
     setRunning(true);
     try {
-      const newRun = await createRun(modalScenario.id, selectedPolicyId);
+      const newRun = await createRun(modalScenario.id, selectedPolicyId, agentEndpoint);
       setRuns(prev => [newRun, ...prev]);
       setSelectedRun(newRun);
       setModalScenario(null);
@@ -1094,6 +1095,21 @@ export default function App() {
                     </label>
                   ))}
                 </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
+                  Agent endpoint <span className="text-slate-500 font-normal">(optional)</span>
+                </label>
+                <input
+                  value={agentEndpoint}
+                  onChange={(e) => setAgentEndpoint(e.target.value)}
+                  placeholder="http://localhost:9000/act"
+                  className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white font-mono"
+                />
+                <p className="text-[11px] text-slate-500 mt-1 leading-snug">
+                  Your agent's HTTP endpoint. Leave empty to use the built-in reference agent (worst case).
+                </p>
               </div>
             </div>
 
