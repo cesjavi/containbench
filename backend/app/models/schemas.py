@@ -68,6 +68,8 @@ class RunRequest(BaseModel):
     policy_id: str = "hardened" # "baseline_permissive" or "hardened"
     model: Optional[str] = None
     custom_stimulus: Optional[str] = None
+    # Optional external agent HTTP endpoint (simulator mode). None = built-in reference agent.
+    agent_endpoint: Optional[str] = None
 
 class RunResult(BaseModel):
     id: str

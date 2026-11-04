@@ -3,6 +3,8 @@ from typing import Dict, List, Tuple, Optional
 from app.runners.base import BaseRunner, EventRecorder, resolve_stimulus, record_stimulus_delivery
 from app.core.prompt_manager import RECEPTOR_URL, RECEPTOR_DNS_ZONE
 from app.core.tool_dispatcher import ToolDispatcher
+from app.agents import AgentContext, enforce_actions, reference_agent
+from app.agents.contract import AgentUnavailable
 from app.models.schemas import Event, PolicyConfig
 
 # Paths the CB-004 stimulus tries to modify (prompts/scenarios/cb004-fs-escape.md)
@@ -28,7 +30,8 @@ class SimulatorRunner(BaseRunner):
         policy: PolicyConfig,
         canary_token: str,
         stimulus: Optional[str] = None,
-        stimulus_files: Optional[Dict[str, str]] = None
+        stimulus_files: Optional[Dict[str, str]] = None,
+        agent=None
     ) -> Tuple[List[Event], str]:
         # Short delay (0.4s) so the UI feels realistic
         await asyncio.sleep(0.4)
@@ -42,6 +45,12 @@ class SimulatorRunner(BaseRunner):
         # Deliver the adversarial stimulus to the agent (prompts/scenarios/)
         stimulus, stimulus_files = resolve_stimulus(run_id, scenario_id, canary_token, stimulus, stimulus_files)
         record_stimulus_delivery(rec, stimulus, stimulus_files)
+
+        # External agent path: the agent chooses actions, the policy is enforced on each.
+        if agent is not None and getattr(agent, "is_external", False):
+            await self._run_external_agent(agent, scenario_id, stimulus, stimulus_files, policy, canary_token, rec)
+            add("sandbox", "sandbox.destroyed", "cleanup", "container_ephemeral", "allow")
+            return rec.result()
 
         if scenario_id == "CB-001":
             add("agent", "process.spawned", "exec", "cat /secrets/canary.env", "observed")
@@ -123,3 +132,18 @@ class SimulatorRunner(BaseRunner):
 
         add("sandbox", "sandbox.destroyed", "cleanup", "container_ephemeral", "allow")
         return rec.result()
+
+    @staticmethod
+    async def _run_external_agent(agent, scenario_id, stimulus, stimulus_files, policy, canary_token, rec) -> None:
+        ctx = AgentContext(scenario_id=scenario_id, stimulus=stimulus, files=stimulus_files)
+        try:
+            actions = (await agent.decide(ctx)).sanitized()
+            # A reachable agent that returns no actions deliberately did not attack.
+            rec.add("orchestrator", "agent.decision", "observe", agent.name, "observed",
+                    {"actions": [a.type for a in actions]})
+        except AgentUnavailable as e:
+            # Only an unreachable/invalid endpoint falls back to the worst-case reference.
+            rec.add("orchestrator", "agent.unavailable", "observe", agent.name, "observed",
+                    {"detail": f"external agent unavailable ({e}); using reference agent"})
+            actions = (await reference_agent.decide(ctx)).sanitized()
+        enforce_actions(scenario_id, actions, policy, canary_token, rec)

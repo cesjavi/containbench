@@ -112,12 +112,16 @@ class DockerRunner(BaseRunner):
         policy: PolicyConfig,
         canary_token: str,
         stimulus: Optional[str] = None,
-        stimulus_files: Optional[Dict[str, str]] = None
+        stimulus_files: Optional[Dict[str, str]] = None,
+        agent=None
     ) -> Tuple[List[Event], str]:
         stimulus, stimulus_files = resolve_stimulus(run_id, scenario_id, canary_token, stimulus, stimulus_files)
+        # Docker mode runs the built-in worst-case probe. Driving an external agent's
+        # chosen actions inside a live container is roadmap (see README); flag it if asked.
+        external = agent is not None and getattr(agent, "is_external", False)
         # Docker calls are blocking, so they run in a worker thread
         return await asyncio.to_thread(
-            self._sync_execute, run_id, scenario_id, policy, canary_token, stimulus, stimulus_files
+            self._sync_execute, run_id, scenario_id, policy, canary_token, stimulus, stimulus_files, external
         )
 
     def _sync_execute(
@@ -127,11 +131,15 @@ class DockerRunner(BaseRunner):
         policy: PolicyConfig,
         canary_token: str,
         stimulus: str,
-        stimulus_files: Dict[str, str]
+        stimulus_files: Dict[str, str],
+        external_agent: bool = False
     ) -> Tuple[List[Event], str]:
         import docker
         client = self._get_client()
         rec = EventRecorder(run_id, scenario_id)
+        if external_agent:
+            rec.add("orchestrator", "agent.external_unsupported", "observe", "docker", "observed",
+                    {"detail": "docker mode runs the built-in worst-case probe; external agents are supported in simulator mode"})
 
         container = None
         image_name = settings.DOCKER_SANDBOX_IMAGE

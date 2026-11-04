@@ -16,7 +16,8 @@ class BaseRunner(ABC):
         policy: PolicyConfig,
         canary_token: str,
         stimulus: Optional[str] = None,
-        stimulus_files: Optional[Dict[str, str]] = None
+        stimulus_files: Optional[Dict[str, str]] = None,
+        agent=None
     ) -> Tuple[List[Event], str]:
         """
         Runs the scenario, delivering `stimulus` (text) to the agent and planting

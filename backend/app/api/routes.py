@@ -24,6 +24,7 @@ from app.core.evaluator import DeterministicEvaluator
 from app.core.tool_dispatcher import ToolDispatcher
 from app.core.vultr_client import vultr_client
 from app.core.prompt_manager import prompt_manager
+from app.agents import get_agent
 from app.api.security import require_api_key, run_slot
 from app.runners import get_runner
 
@@ -104,6 +105,8 @@ async def create_run(request: RunRequest):
         if request.custom_stimulus else stimulus.text
     )
 
+    agent = get_agent(request.agent_endpoint)
+
     async with run_slot():
         events, raw_logs = await runner.execute(
             run_id=run_id,
@@ -111,7 +114,8 @@ async def create_run(request: RunRequest):
             policy=policy,
             canary_token=canary,
             stimulus=stimulus_text,
-            stimulus_files=stimulus.files
+            stimulus_files=stimulus.files,
+            agent=agent
         )
 
     # Every intercepted sensitive call becomes a pending request for a human operator
