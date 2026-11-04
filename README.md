@@ -97,6 +97,13 @@ cd backend
 .venv\Scripts\python -m pytest -q
 ```
 
+**Smoke test (against a running instance):** drives the API over HTTP — the six
+scenarios under both policies, the CB-006 approval flow and the report. Stdlib only.
+```bash
+CONTAINBENCH_URL=http://localhost:8000 CONTAINBENCH_API_KEY=<key> python3 scripts/smoke_test.py
+```
+Use it to validate a Vultr VM in `docker` mode once the stack is up.
+
 ## Deployment on a Vultr VM (Production)
 
 On the Vultr Linux instance:
