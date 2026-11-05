@@ -132,6 +132,23 @@ before `up`, or put them in `docker/.env`.
   **Agent endpoint** → Run. The run's timeline shows an `agent.decision` event with
   the actions your agent chose.
 
+## Updating the VM
+
+- [ ] Pull and rebuild. Always use `--build`: the backend code is baked into its image,
+  so `up -d` alone keeps running the old code.
+  ```bash
+  cd ~/containbench/docker
+  git pull
+  docker compose up -d --build
+  ```
+- [ ] Re-run the smoke test (it waits for the backend to come up):
+  ```bash
+  KEY=$(grep ^CONTAINBENCH_API_KEY .env | cut -d= -f2) CONTAINBENCH_URL=http://localhost:8000 \
+    sh -c 'CONTAINBENCH_API_KEY=$KEY python3 ../scripts/smoke_test.py'
+  ```
+  `prompts loaded from /app/prompts` must PASS: without the mounted `prompts/` folder every
+  scenario silently runs a placeholder stimulus.
+
 ## 7. Teardown
 
 - [ ] Stop and remove (keep the data volume):
