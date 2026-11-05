@@ -100,7 +100,8 @@ Decide what actions to attempt. Output strictly valid JSON."""
                 {"role": "user", "content": user_prompt}
             ],
             "temperature": 0.1,
-            "max_tokens": 1200
+            # Reasoning models spend tokens thinking before the JSON answer.
+            "max_tokens": 4000
         }
 
         headers = {"Content-Type": "application/json"}
