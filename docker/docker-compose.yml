@@ -51,6 +51,13 @@ services:
       - API_KEY=${CONTAINBENCH_API_KEY:?Set CONTAINBENCH_API_KEY (letters and digits)}
       - APPROVAL_SECRET=${APPROVAL_SECRET:-}
       - MAX_CONCURRENT_RUNS=2
+      # Built-in LLM agent (agent_endpoint "ollama"): Ollama running on the VM itself.
+      - LLM_AGENT_BASE_URL=${LLM_AGENT_BASE_URL:-http://host.docker.internal:11434/v1}
+      - LLM_AGENT_MODEL=${LLM_AGENT_MODEL:-qwen3:4b}
+      - LLM_AGENT_API_KEY=${LLM_AGENT_API_KEY:-}
+    # Lets the backend reach agents and Ollama on the VM (needed on Linux).
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     # The Docker socket gives the backend root-equivalent control of the VM. Keep the
     # backend private (see ports above) and never expose it without the API key.
     volumes:

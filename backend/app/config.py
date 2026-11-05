@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_RUNS: int = 2
     # Timeout for the backend's call to an external agent endpoint (local LLMs can be slow).
     AGENT_TIMEOUT_SECONDS: float = 120.0
+    # Built-in LLM agent under test (agent_endpoint "ollama" / "ollama://<model>").
+    # Independent of the Vultr settings above, which only write explanations and reports.
+    # Inside Docker Compose use http://host.docker.internal:11434/v1 to reach Ollama on the VM.
+    LLM_AGENT_BASE_URL: str = "http://localhost:11434/v1"
+    LLM_AGENT_MODEL: str = "qwen3:4b"
+    LLM_AGENT_API_KEY: str = ""
     # Comma-separated hostnames the backend may call as agent_endpoint. Empty = any host.
     AGENT_ALLOWED_HOSTS: str = ""
 

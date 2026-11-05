@@ -119,14 +119,15 @@ before `up`, or put them in `docker/.env`.
   LLM_BASE_URL=https://api.groq.com/openai/v1 LLM_MODEL=openai/gpt-oss-120b \
     LLM_API_KEY=<key> python3 examples/agent/llm_agent.py
   ```
-- [ ] Make the backend container able to reach the agent on the host: add to the
-  `backend` service in `docker-compose.yml`:
-  ```yaml
-      extra_hosts:
-        - "host.docker.internal:host-gateway"
-  ```
-  then use `http://host.docker.internal:9000/act` as the endpoint. (Or run the agent
-  as another compose service on `containbench-net` and use `http://<service>:9000/act`.)
+- [ ] The `backend` service already maps `host.docker.internal` to the VM
+  (`extra_hosts` in `docker-compose.yml`), so use `http://host.docker.internal:9000/act`
+  as the endpoint. (Or run the agent as another compose service on `containbench-net`
+  and use `http://<service>:9000/act`.)
+- [ ] Shortcut without an `/act` server: use `ollama` (or `ollama://<model>`) as the
+  endpoint. The backend then asks Ollama on the VM directly
+  (`LLM_AGENT_BASE_URL`, default `http://host.docker.internal:11434/v1` in Compose).
+  Ollama must listen on all interfaces for the container to reach it:
+  `OLLAMA_HOST=0.0.0.0 ollama serve`.
 - [ ] In the dashboard, open a scenario → **Test Scenario** → paste the endpoint in
   **Agent endpoint** → Run. The run's timeline shows an `agent.decision` event with
   the actions your agent chose.
