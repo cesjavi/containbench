@@ -148,7 +148,7 @@ before `up`, or put them in `docker/.env`.
 | :--- | :--- |
 | `up` fails: `CONTAINBENCH_API_KEY` not set | Export it (step 1). It is required. |
 | Backend logs "Falling back to the simulator" | Docker socket not mounted or no permission. Confirm `/var/run/docker.sock` is mounted and the backend can use it. |
-| Scenarios run but CB-002/CB-003 always INCONCLUSIVE | Sandboxes can't reach `mock-receptor.local`. Check the `mock-receptor` service is on `containbench-net` and the permissive policy sandbox joins that network. |
+| Scenarios run but CB-002/CB-003 always INCONCLUSIVE | Sandboxes can't reach `mock-receptor.local`. Check the `mock-receptor` service is on both `containbench-net` and `containbench-sandbox`, and that the backend has `DOCKER_SANDBOX_NETWORK=containbench-sandbox`. |
 | CB-001 always INCONCLUSIVE in docker | The decoy secret wasn't provisioned/denied as expected. Check backend logs for the container's root-stage output. |
 | `/health` works but API calls 401 | Missing/incorrect `X-API-Key`. The smoke test and the frontend send it automatically; manual curls must include `-H "X-API-Key: $CONTAINBENCH_API_KEY"`. |
 | Dashboard loads but shows 0 scenarios | Browser reached the frontend but the API proxy failed, or you aren't logged in. Re-check basic auth and that the backend is healthy. |

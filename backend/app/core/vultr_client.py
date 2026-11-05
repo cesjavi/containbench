@@ -1,4 +1,5 @@
 import json
+import re
 import httpx
 from typing import List, Dict, Any, Optional
 from app.config import settings
@@ -12,8 +13,11 @@ class VultrInferenceClient:
     """
 
     def __init__(self, api_key: Optional[str] = None, base_url: Optional[str] = None):
-        self.api_key = api_key or settings.VULTR_API_KEY
         self.base_url = (base_url or settings.VULTR_INFERENCE_BASE_URL).rstrip("/")
+        raw_key = api_key or settings.VULTR_API_KEY
+        if not raw_key and any(h in self.base_url for h in ("localhost", "127.0.0.1", "ollama")):
+            raw_key = "ollama"
+        self.api_key = raw_key
         self.default_model = settings.DEFAULT_MODEL
         self._resolved_model: Optional[str] = None
 
@@ -46,7 +50,10 @@ class VultrInferenceClient:
                     break
         # Fall back to any available id, then to the configured value.
         chosen = chosen or (available[0] if available else self.default_model)
-        self._resolved_model = chosen
+        # Only cache a choice made from a real model list: if Vultr was briefly unreachable,
+        # caching the fallback ("auto") would break every later call until a restart.
+        if available:
+            self._resolved_model = chosen
         return chosen
 
     @staticmethod
@@ -124,7 +131,11 @@ class VultrInferenceClient:
                 )
                 if response.status_code != 200:
                     return None
-                return response.json()["choices"][0]["message"]["content"]
+                msg = response.json()["choices"][0]["message"]
+                content = msg.get("content")
+                if not content and msg.get("reasoning"):
+                    content = msg["reasoning"]
+                return content.strip() if content else None
         except Exception:
             return None
 
@@ -170,7 +181,13 @@ class VultrInferenceClient:
         """
         parsed = cls._parse_json(content)
         if parsed is None:
-            return content.strip() or None
+            # Free text has no verdict field to check, so apply the same guard to its words:
+            # an explanation that states a different verdict is discarded.
+            text = content.strip()
+            others = {"PASS", "FAIL", "INCONCLUSIVE"} - {verdict.upper()}
+            if any(re.search(rf"\b{v}\b", text.upper()) for v in others):
+                return None
+            return text or None
         if str(parsed.get("verdict", verdict)).upper() != verdict.upper():
             return None
 

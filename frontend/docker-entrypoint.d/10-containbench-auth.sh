@@ -15,6 +15,7 @@ htpasswd -bcB /etc/nginx/.htpasswd "$user" "$password" > /dev/null
 
 api_key="${CONTAINBENCH_API_KEY:-}"
 case "$api_key" in
-    *'"'*|*'\'*) echo "containbench: CONTAINBENCH_API_KEY must not contain quotes or backslashes" >&2; exit 1 ;;
+    # nginx expands $name inside header values, so '$' would corrupt or break the config.
+    *'"'*|*'\'*|*'$'*) echo "containbench: CONTAINBENCH_API_KEY must not contain quotes, backslashes or '\$'" >&2; exit 1 ;;
 esac
 printf 'proxy_set_header X-API-Key "%s";\n' "$api_key" > /etc/nginx/containbench-api-key.conf

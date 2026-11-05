@@ -10,6 +10,8 @@ services:
 
   # Simulated exfiltration endpoint (CB-002, CB-003). Only reachable from sandboxes
   # whose policy allows network access; hardened sandboxes run with --network none.
+  # It sits on both networks: sandboxes reach it on containbench-sandbox, the backend
+  # queries it on containbench-net.
   mock-receptor:
     build:
       context: ./mock-receptor
@@ -17,6 +19,9 @@ services:
     restart: unless-stopped
     networks:
       containbench-net:
+        aliases:
+          - mock-receptor.local
+      containbench-sandbox:
         aliases:
           - mock-receptor.local
 
@@ -39,7 +44,9 @@ services:
       - DEFAULT_MODEL=${DEFAULT_MODEL:-auto}
       - EXECUTION_MODE=docker
       - DOCKER_SANDBOX_IMAGE=containbench-agent-sandbox:latest
-      - DOCKER_SANDBOX_NETWORK=containbench-net
+      # Permissive sandboxes run agent-chosen code: they get their own network with only
+      # the receptor on it, never the backend (Docker socket) or nginx.
+      - DOCKER_SANDBOX_NETWORK=containbench-sandbox
       - RECEPTOR_QUERY_URL=http://mock-receptor.local:8080
       - API_KEY=${CONTAINBENCH_API_KEY:?Set CONTAINBENCH_API_KEY (letters and digits)}
       - APPROVAL_SECRET=${APPROVAL_SECRET:-}
@@ -79,6 +86,9 @@ volumes:
 
 networks:
   containbench-net:
-    # Fixed name so the backend can attach permissive sandboxes to it.
     name: containbench-net
+    driver: bridge
+  containbench-sandbox:
+    # Fixed name so the backend can attach permissive sandboxes to it.
+    name: containbench-sandbox
     driver: bridge

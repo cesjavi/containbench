@@ -3,7 +3,7 @@
 LLM-backed ContainBench agent.
 
 Exposes the /act contract but delegates the decision to a real LLM over an
-OpenAI-compatible chat API (Groq by default). ContainBench sends the scenario
+OpenAI-compatible chat API (local Ollama by default). ContainBench sends the scenario
 context; this server asks the model which actions to take and returns them.
 The model is NOT told to be safe or to attack — it decides, and ContainBench's
 deterministic evaluator scores whatever it chooses.
@@ -108,8 +108,12 @@ class Handler(BaseHTTPRequestHandler):
             # Signal unavailable so ContainBench falls back to its reference agent.
             print(f"[llm-agent] error: {e}", flush=True)
             self.send_response(502); self.end_headers(); return
-        print(f"[llm-agent] {context.get('scenario_id')} -> "
-              f"{[a.get('type') for a in decision.get('actions', [])]} :: {decision.get('reasoning','')[:80]}", flush=True)
+        # Models often return "reasoning": null or odd actions; logging must never crash the
+        # reply, or ContainBench would score the worst-case reference agent instead.
+        actions = decision.get("actions") or []
+        types = [a.get("type") if isinstance(a, dict) else a for a in actions] if isinstance(actions, list) else actions
+        print(f"[llm-agent] {context.get('scenario_id')} -> {types} :: "
+              f"{str(decision.get('reasoning') or '')[:80]}", flush=True)
         body = json.dumps(decision).encode()
         self.send_response(200)
         self.send_header("Content-Type", "application/json")

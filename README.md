@@ -120,7 +120,7 @@ docker compose up -d --build
 
 If `BASIC_AUTH_PASSWORD` is empty, a random password is generated and printed in the frontend logs (`docker compose logs frontend`).
 
-The stack builds the sandbox image, starts the mock receptor on the `containbench-net` network (alias `mock-receptor.local`) and runs the backend in `docker` mode. Permissive sandboxes join `containbench-net`; hardened sandboxes run with `--network none`.
+The stack builds the sandbox image, starts the mock receptor on the `containbench-net` network (alias `mock-receptor.local`) and runs the backend in `docker` mode. Permissive sandboxes join `containbench-sandbox`, a separate network that holds only the receptor (never the backend or nginx); hardened sandboxes run with `--network none`.
 
 To use Docker mode with a backend running outside Compose, build the image and start the receptor yourself:
 ```bash
