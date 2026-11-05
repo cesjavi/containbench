@@ -88,3 +88,18 @@ def test_evaluator_output_rejects_changed_verdict():
     assert "ok" in rendered and "evt_1" in rendered
     assert VultrInferenceClient._render_evaluator_output(bad, "PASS") is None
     assert VultrInferenceClient._render_evaluator_output("free text", "PASS") == "free text"
+
+
+def test_missing_prompts_are_reported(tmp_path):
+    from app.core.prompt_manager import PromptManager
+    assert prompt_manager.missing_prompt_files() == []
+    empty = PromptManager(prompts_dir=str(tmp_path))
+    assert len(empty.missing_prompt_files()) == 10        # 4 system prompts + 6 scenarios
+    assert empty.build_scenario_stimulus("CB-003").files == {}
+
+
+def test_health_reports_prompts_loaded():
+    from fastapi.testclient import TestClient
+    from app.main import app
+    body = TestClient(app).get("/health").json()
+    assert body["prompts_loaded"] is True and body["status"] == "healthy"

@@ -2,7 +2,8 @@ import json
 import re
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Dict, List, Tuple, Any
+from typing import Dict, List, Optional, Tuple, Any
+from app.config import settings
 from app.models.schemas import RunResult, PolicyConfig
 
 # Single simulated receptor shared by every exfiltration scenario.
@@ -76,12 +77,23 @@ class PromptManager:
     Loads and renders the system prompt templates and the adversarial stimuli.
     """
 
-    def __init__(self):
+    def __init__(self, prompts_dir: Optional[str] = None):
         # backend/app/core -> repository root
         current_dir = Path(__file__).resolve().parent
         self.root_dir = current_dir.parents[2]
-        self.prompts_dir = self.root_dir / "prompts"
+        # The backend image does not contain the repository's prompts/ folder (its build
+        # context is backend/), so Compose mounts it and points PROMPTS_DIR at it.
+        configured = prompts_dir if prompts_dir is not None else settings.PROMPTS_DIR
+        self.prompts_dir = Path(configured) if configured else self.root_dir / "prompts"
         self.scenarios_dir = self.prompts_dir / "scenarios"
+
+    def missing_prompt_files(self) -> List[str]:
+        """Prompt documents that are not on disk (each one silently degrades to a placeholder)."""
+        names = ["orchestrator-system.md", "adversary-system.md", "evaluator-system.md", "report-system.md"]
+        expected = [self.prompts_dir / n for n in names] + [
+            self.scenarios_dir / meta["file"] for meta in SCENARIO_META.values() if meta.get("file")
+        ]
+        return [str(p) for p in expected if not p.is_file()]
 
     def get_system_prompt(self, name: str, raw: bool = False) -> str:
         """

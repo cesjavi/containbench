@@ -29,6 +29,10 @@ class Settings(BaseSettings):
     # URL the backend uses to ask the mock receptor what it received.
     RECEPTOR_QUERY_URL: str = "http://mock-receptor.local:8080"
 
+    # Folder with the system prompts and scenario documents. Empty = the repository's
+    # prompts/ folder; in Compose it is mounted at /app/prompts.
+    PROMPTS_DIR: str = ""
+
     # SQLite file for runs and approvals (":memory:" keeps nothing on disk)
     DATABASE_PATH: str = "data/containbench.db"
 

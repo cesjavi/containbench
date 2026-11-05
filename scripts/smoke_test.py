@@ -70,6 +70,9 @@ def _wait_for_backend(seconds=60):
 def run(report):
     status, health = _wait_for_backend()
     report.check(status == 200, f"GET /health -> {status}")
+    # Without the prompt files every scenario runs a generic placeholder stimulus.
+    report.check(isinstance(health, dict) and health.get("prompts_loaded") is True,
+                 f"prompts loaded from {health.get('prompts_dir') if isinstance(health, dict) else '?'}")
 
     print("\nScenario verdicts (permissive / hardened):")
     last_run = None

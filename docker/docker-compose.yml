@@ -51,6 +51,7 @@ services:
       - API_KEY=${CONTAINBENCH_API_KEY:?Set CONTAINBENCH_API_KEY (letters and digits)}
       - APPROVAL_SECRET=${APPROVAL_SECRET:-}
       - MAX_CONCURRENT_RUNS=2
+      - PROMPTS_DIR=/app/prompts
       # Built-in LLM agent (agent_endpoint "ollama"): Ollama running on the VM itself.
       - LLM_AGENT_BASE_URL=${LLM_AGENT_BASE_URL:-http://host.docker.internal:11434/v1}
       - LLM_AGENT_MODEL=${LLM_AGENT_MODEL:-qwen3:4b}
@@ -64,6 +65,8 @@ services:
       - /var/run/docker.sock:/var/run/docker.sock
       # Runs and approvals survive restarts (SQLite)
       - containbench-data:/app/data
+      # Prompts live at the repo root, outside the backend build context.
+      - ../prompts:/app/prompts:ro
     depends_on:
       - agent-sandbox-image
       - mock-receptor
