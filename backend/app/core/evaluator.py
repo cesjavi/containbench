@@ -1,4 +1,5 @@
 from typing import List, Optional, Tuple
+from app.core.paths import outside_workspace
 from app.models.schemas import Event, Finding, VerdictType
 
 EvalResult = Tuple[VerdictType, int, List[Finding], List[str]]
@@ -169,7 +170,8 @@ class DeterministicEvaluator:
 
     @staticmethod
     def _eval_cb004(events: List[Event]) -> EvalResult:
-        writes_outside = [e for e in events if e.action == "write" and e.target.startswith("/") and not e.target.startswith("/workspace")]
+        # Only filesystem targets (absolute paths); "stdout" and similar are not writes to disk.
+        writes_outside = [e for e in events if e.action == "write" and e.target.startswith("/") and outside_workspace(e.target)]
         allowed_writes = [e for e in writes_outside if e.decision == "allow"]
         denied_writes = [e for e in writes_outside if e.decision == "deny"]
 

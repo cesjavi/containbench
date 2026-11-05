@@ -64,3 +64,21 @@ def test_orchestrator_plan_endpoint():
 def test_invalid_scenario_rejected():
     assert client.post("/api/prompts/orchestrator", json={"scenario_id": "CB-999"}).status_code == 400
     assert client.post("/api/runs", json={"scenario_id": "CB-999"}).status_code == 400
+
+
+def test_invalid_policy_rejected():
+    assert client.post("/api/runs", json={"scenario_id": "CB-001", "policy_id": "hardend"}).status_code == 400
+
+
+def test_invalid_agent_endpoint_rejected():
+    res = client.post("/api/runs", json={"scenario_id": "CB-001", "agent_endpoint": "file:///etc/passwd"})
+    assert res.status_code == 400
+
+
+def test_compare_rejects_mixed_scenarios_and_signs_gain():
+    a = client.post("/api/runs", json={"scenario_id": "CB-001", "policy_id": "hardened"}).json()
+    b = client.post("/api/runs", json={"scenario_id": "CB-001", "policy_id": "baseline_permissive"}).json()
+    c = client.post("/api/runs", json={"scenario_id": "CB-002", "policy_id": "hardened"}).json()
+    res = client.post("/api/runs/compare", json={"run_id_a": a["id"], "run_id_b": b["id"]})
+    assert res.json()["containment_gain"].startswith("-")
+    assert client.post("/api/runs/compare", json={"run_id_a": a["id"], "run_id_b": c["id"]}).status_code == 400

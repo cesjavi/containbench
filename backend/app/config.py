@@ -44,6 +44,12 @@ class Settings(BaseSettings):
     MAX_CONCURRENT_RUNS: int = 2
     # Timeout for the backend's call to an external agent endpoint (local LLMs can be slow).
     AGENT_TIMEOUT_SECONDS: float = 120.0
+    # Comma-separated hostnames the backend may call as agent_endpoint. Empty = any host.
+    AGENT_ALLOWED_HOSTS: str = ""
+
+    @property
+    def agent_allowed_hosts(self) -> list:
+        return [h.strip().lower() for h in self.AGENT_ALLOWED_HOSTS.split(",") if h.strip()]
 
     @property
     def cors_origins(self) -> list:

@@ -25,6 +25,7 @@ from app.core.tool_dispatcher import ToolDispatcher
 from app.core.vultr_client import vultr_client
 from app.core.prompt_manager import prompt_manager
 from app.agents import get_agent
+from app.agents.http_agent import validate_agent_endpoint
 from app.api.security import require_api_key, run_slot
 from app.runners import get_runner
 
@@ -88,8 +89,15 @@ async def create_run(request: RunRequest):
     """
     if request.scenario_id not in SCENARIOS:
         raise HTTPException(status_code=400, detail=f"Invalid scenario: {request.scenario_id}")
+    if request.policy_id not in POLICIES:
+        # Never fall back silently: a typo must not run a different policy than the one asked for.
+        raise HTTPException(status_code=400, detail=f"Invalid policy: {request.policy_id}")
+    if request.agent_endpoint:
+        problem = validate_agent_endpoint(request.agent_endpoint)
+        if problem:
+            raise HTTPException(status_code=400, detail=problem)
 
-    policy = POLICIES.get(request.policy_id, POLICIES["hardened"])
+    policy = POLICIES[request.policy_id]
     run_id = f"run_{uuid.uuid4().hex[:8]}"
     created_at = datetime.now(timezone.utc).isoformat()
     canary = generate_canary_token()
@@ -182,6 +190,8 @@ async def compare_runs(req: ComparisonRequest):
     run_b = store.get_run(req.run_id_b)
     if run_a is None or run_b is None:
         raise HTTPException(status_code=404, detail="One or both runs do not exist")
+    if run_a.scenario_id != run_b.scenario_id:
+        raise HTTPException(status_code=400, detail="Both runs must belong to the same scenario")
 
     effective_controls = []
     if run_b.verdict == "PASS" and run_a.verdict != "PASS":
@@ -191,7 +201,7 @@ async def compare_runs(req: ComparisonRequest):
             effective_controls.append("Read-only root filesystem (--read-only)")
         if run_b.policy.protect_secrets and not run_a.policy.protect_secrets:
             effective_controls.append("Secrets directory unreadable by the agent user")
-        if run_b.policy.require_approval_tools:
+        if set(run_b.policy.require_approval_tools) - set(run_a.policy.require_approval_tools):
             effective_controls.append("Mandatory human-in-the-loop on sensitive tools")
         if run_b.policy.pids_limit < run_a.policy.pids_limit:
             effective_controls.append("Resource containment through cgroups (PIDs / memory limit)")
@@ -204,7 +214,7 @@ async def compare_runs(req: ComparisonRequest):
         f"'{run_b.policy.name}' got {run_b.verdict} ({run_b.score}/100)."
     )
 
-    gain = f"+{run_b.score - run_a.score} containment points"
+    gain = f"{run_b.score - run_a.score:+d} containment points"
 
     return ComparisonResult(
         scenario_id=run_b.scenario_id,

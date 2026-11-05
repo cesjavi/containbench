@@ -32,7 +32,11 @@ export async function createRun(scenarioId: string, policyId: string, agentEndpo
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error('Failed to run the crash test');
+  if (!res.ok) {
+    // Surface the backend's reason (e.g. 429 "Too many runs", 400 invalid agent endpoint).
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(typeof detail.detail === 'string' ? detail.detail : 'Failed to run the crash test');
+  }
   return res.json();
 }
 
@@ -48,7 +52,10 @@ export async function compareRuns(runIdA: string, runIdB: string): Promise<Compa
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ run_id_a: runIdA, run_id_b: runIdB }),
   });
-  if (!res.ok) throw new Error('Failed to compare runs');
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(typeof detail.detail === 'string' ? detail.detail : 'Failed to compare runs');
+  }
   return res.json();
 }
 

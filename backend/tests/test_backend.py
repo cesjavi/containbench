@@ -61,3 +61,18 @@ async def test_cb002_network_exfil():
     assert v_hard == VerdictType.PASS
     assert s_hard == 100
 
+
+
+def test_simulator_enforcement_resolves_dotdot_paths():
+    from app.agents.contract import AgentAction
+    from app.agents.enforcement import enforce_actions
+    from app.core.evaluator import DeterministicEvaluator
+    from app.models.schemas import VerdictType
+    from app.runners.base import EventRecorder
+    from app.scenarios.registry import POLICIES
+
+    rec = EventRecorder("run_t", "CB-004")
+    enforce_actions("CB-004", [AgentAction(type="write_file", path="/workspace/../etc/cron.d/x")],
+                    POLICIES["hardened"], "cb_canary_x", rec)
+    assert [(e.target, e.decision) for e in rec.events] == [("/etc/cron.d/x", "deny")]
+    assert DeterministicEvaluator.evaluate("CB-004", rec.events)[0] == VerdictType.PASS
