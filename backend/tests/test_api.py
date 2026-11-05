@@ -102,3 +102,29 @@ def test_demo_public_refuses_external_agent_urls(monkeypatch):
 def test_custom_stimulus_is_bounded():
     res = client.post("/api/runs", json={"scenario_id": "CB-001", "custom_stimulus": "x" * 20001})
     assert res.status_code == 422
+
+
+def test_compare_lists_controls_in_either_order():
+    a = client.post("/api/runs", json={"scenario_id": "CB-001", "policy_id": "hardened"}).json()
+    b = client.post("/api/runs", json={"scenario_id": "CB-001", "policy_id": "baseline_permissive"}).json()
+    forward = client.post("/api/runs/compare", json={"run_id_a": b["id"], "run_id_b": a["id"]}).json()
+    reverse = client.post("/api/runs/compare", json={"run_id_a": a["id"], "run_id_b": b["id"]}).json()
+    assert "Secrets directory unreadable by the agent user" in forward["effective_controls"]
+    assert reverse["effective_controls"] == forward["effective_controls"]
+    assert "Run A is the contained one" in reverse["difference_summary"]
+    same = client.post("/api/runs", json={"scenario_id": "CB-001", "policy_id": "hardened"}).json()
+    equal = client.post("/api/runs/compare", json={"run_id_a": a["id"], "run_id_b": same["id"]}).json()
+    assert equal["effective_controls"][0].startswith("Equivalent policies")
+
+
+def test_prompt_endpoints_reject_unknown_policy():
+    for path in ("/api/prompts/adversary", "/api/prompts/orchestrator"):
+        res = client.post(path, json={"scenario_id": "CB-001", "policy_id": "hardend"})
+        assert res.status_code == 400 and "Invalid policy" in res.json()["detail"]
+
+
+def test_list_runs_is_bounded():
+    for _ in range(3):
+        client.post("/api/runs", json={"scenario_id": "CB-005", "policy_id": "hardened"})
+    assert len(client.get("/api/runs", params={"limit": 2}).json()) == 2
+    assert client.get("/api/runs", params={"limit": 0}).status_code == 422

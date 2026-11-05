@@ -185,9 +185,11 @@ export default function App() {
   const runQuickDemoAB = async (scenarioId: string = 'CB-001') => {
     setRunning(true);
     try {
+      // Each run is listed as soon as it exists, so a failure in the second one does not hide the first.
       const runA = await createRun(scenarioId, 'baseline_permissive');
+      setRuns(prev => [runA, ...prev]);
       const runB = await createRun(scenarioId, 'hardened');
-      setRuns(prev => [runB, runA, ...prev]);
+      setRuns(prev => [runB, ...prev]);
       setCompRunA(runA.id);
       setCompRunB(runB.id);
       const comp = await compareRuns(runA.id, runB.id);

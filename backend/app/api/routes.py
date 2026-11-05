@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 from typing import Any, List, Dict, Optional
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 from app.models.schemas import (
     ScenarioDefinition,
@@ -14,7 +14,8 @@ from app.models.schemas import (
     Event,
     ApprovalStatus,
     ApprovalRequest,
-    ApprovalDecision
+    ApprovalDecision,
+    VerdictType,
 )
 from app.scenarios.registry import SCENARIOS, POLICIES
 from app.core.approvals import approval_service
@@ -169,9 +170,9 @@ async def create_run(request: RunRequest):
     return result
 
 @router.get("/runs", response_model=List[RunResult])
-async def list_runs():
-    """Returns every recorded run, newest first."""
-    return store.list_runs()
+async def list_runs(limit: int = Query(default=100, ge=1, le=500)):
+    """Returns the most recent runs, newest first (each one carries its full timeline and logs)."""
+    return store.list_runs(limit)
 
 @router.get("/runs/{run_id}", response_model=RunResult)
 async def get_run(run_id: str):
@@ -193,26 +194,44 @@ async def compare_runs(req: ComparisonRequest):
     if run_a.scenario_id != run_b.scenario_id:
         raise HTTPException(status_code=400, detail="Both runs must belong to the same scenario")
 
+    # Whichever run was contained is the "strong" one, so the order of A and B does not matter.
+    contained, exposed = None, None
+    if run_b.verdict == VerdictType.PASS and run_a.verdict != VerdictType.PASS:
+        contained, exposed = run_b, run_a
+    elif run_a.verdict == VerdictType.PASS and run_b.verdict != VerdictType.PASS:
+        contained, exposed = run_a, run_b
+
     effective_controls = []
-    if run_b.verdict == "PASS" and run_a.verdict != "PASS":
-        if not run_b.policy.allow_network and run_a.policy.allow_network:
+    if contained is not None:
+        strong, weak = contained.policy, exposed.policy
+        if not strong.allow_network and weak.allow_network:
             effective_controls.append("Network isolation (egress denied)")
-        if run_b.policy.readonly_root and not run_a.policy.readonly_root:
+        if strong.readonly_root and not weak.readonly_root:
             effective_controls.append("Read-only root filesystem (--read-only)")
-        if run_b.policy.protect_secrets and not run_a.policy.protect_secrets:
+        if strong.protect_secrets and not weak.protect_secrets:
             effective_controls.append("Secrets directory unreadable by the agent user")
-        if set(run_b.policy.require_approval_tools) - set(run_a.policy.require_approval_tools):
+        if set(strong.require_approval_tools) - set(weak.require_approval_tools):
             effective_controls.append("Mandatory human-in-the-loop on sensitive tools")
-        if run_b.policy.pids_limit < run_a.policy.pids_limit:
-            effective_controls.append("Resource containment through cgroups (PIDs / memory limit)")
+        if (strong.pids_limit < weak.pids_limit or strong.memory_limit_mb < weak.memory_limit_mb
+                or strong.cpu_limit < weak.cpu_limit):
+            effective_controls.append("Resource containment through cgroups (CPU / PIDs / memory limit)")
 
     if not effective_controls:
-        effective_controls.append("Equivalent policies, or no change in containment state was detected.")
+        if run_a.policy.model_dump(exclude={"id", "name", "description"}) == \
+                run_b.policy.model_dump(exclude={"id", "name", "description"}):
+            effective_controls.append("Equivalent policies: no control differs between the two runs.")
+        elif contained is None:
+            effective_controls.append("Both runs reached the same containment outcome; "
+                                      "the policy differences did not change it.")
+        else:
+            effective_controls.append("No listed control explains the difference in outcome.")
 
     diff_summary = (
         f"Run '{run_a.policy.name}' got {run_a.verdict} ({run_a.score}/100), while "
         f"'{run_b.policy.name}' got {run_b.verdict} ({run_b.score}/100)."
     )
+    if contained is run_a:
+        diff_summary += " Run A is the contained one, so the gain is negative."
 
     gain = f"{run_b.score - run_a.score:+d} containment points"
 
@@ -254,14 +273,21 @@ async def get_run_report(run_id: str):
         "content": report_md
     }
 
-@router.post("/prompts/adversary")
-async def generate_adversary_prompt(payload: Dict[str, str]):
-    """Generates a custom adversarial stimulus with Vultr Inference (prompts/adversary-system.md)."""
+def _scenario_and_policy(payload: Dict[str, str]):
+    """Validates both ids, like create_run: an unknown policy is an error, never a silent default."""
     scenario_id = payload.get("scenario_id", "CB-001")
     if scenario_id not in SCENARIOS:
         raise HTTPException(status_code=400, detail=f"Invalid scenario: {scenario_id}")
     policy_id = payload.get("policy_id", "hardened")
-    return await vultr_client.generate_adversary_stimulus(scenario_id, policy_id)
+    if policy_id not in POLICIES:
+        raise HTTPException(status_code=400, detail=f"Invalid policy: {policy_id}")
+    return scenario_id, POLICIES[policy_id]
+
+@router.post("/prompts/adversary")
+async def generate_adversary_prompt(payload: Dict[str, str]):
+    """Generates a custom adversarial stimulus with Vultr Inference (prompts/adversary-system.md)."""
+    scenario_id, policy = _scenario_and_policy(payload)
+    return await vultr_client.generate_adversary_stimulus(scenario_id, policy.id)
 
 @router.post("/prompts/orchestrator")
 async def generate_execution_plan(payload: Dict[str, str]):
@@ -269,10 +295,7 @@ async def generate_execution_plan(payload: Dict[str, str]):
     Generates a bounded execution plan with prompts/orchestrator-system.md.
     The plan is advisory and auditable: runners never execute model-proposed steps.
     """
-    scenario_id = payload.get("scenario_id", "CB-001")
-    if scenario_id not in SCENARIOS:
-        raise HTTPException(status_code=400, detail=f"Invalid scenario: {scenario_id}")
-    policy = POLICIES.get(payload.get("policy_id", "hardened"), POLICIES["hardened"])
+    scenario_id, policy = _scenario_and_policy(payload)
     sandbox_id = f"sbx_{uuid.uuid4().hex[:8]}"
     return await vultr_client.generate_execution_plan(scenario_id, policy, sandbox_id)
 

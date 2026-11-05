@@ -2,6 +2,17 @@ import { ScenarioDefinition, PolicyConfig, RunResult, ComparisonResult, Approval
 
 const API_BASE = '/api';
 
+/** Readable message from a FastAPI error body: a string detail, or the messages of a 422 list. */
+function errorDetail(body: any, fallback: string): string {
+  const detail = body?.detail;
+  if (typeof detail === 'string') return detail;
+  if (Array.isArray(detail)) {
+    const msgs = detail.map((d: any) => (typeof d?.msg === 'string' ? d.msg : '')).filter(Boolean);
+    if (msgs.length) return msgs.join('; ');
+  }
+  return fallback;
+}
+
 export async function fetchScenarios(): Promise<ScenarioDefinition[]> {
   const res = await fetch(`${API_BASE}/scenarios`);
   if (!res.ok) throw new Error('Failed to load scenarios');
@@ -35,7 +46,7 @@ export async function createRun(scenarioId: string, policyId: string, agentEndpo
   if (!res.ok) {
     // Surface the backend's reason (e.g. 429 "Too many runs", 400 invalid agent endpoint).
     const detail = await res.json().catch(() => ({}));
-    throw new Error(typeof detail.detail === 'string' ? detail.detail : 'Failed to run the crash test');
+    throw new Error(errorDetail(detail, 'Failed to run the crash test'));
   }
   return res.json();
 }
@@ -54,7 +65,7 @@ export async function compareRuns(runIdA: string, runIdB: string): Promise<Compa
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    throw new Error(typeof detail.detail === 'string' ? detail.detail : 'Failed to compare runs');
+    throw new Error(errorDetail(detail, 'Failed to compare runs'));
   }
   return res.json();
 }
@@ -94,7 +105,7 @@ export async function decideApproval(
   });
   if (!res.ok) {
     const detail = await res.json().catch(() => ({}));
-    throw new Error(detail.detail || 'Failed to record the decision');
+    throw new Error(errorDetail(detail, 'Failed to record the decision'));
   }
   return res.json();
 }

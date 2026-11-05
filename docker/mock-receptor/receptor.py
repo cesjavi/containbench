@@ -53,7 +53,12 @@ class ReceptorHandler(BaseHTTPRequestHandler):
         self.wfile.write(body)
 
     def _record(self):
-        length = min(int(self.headers.get("Content-Length") or 0), MAX_BODY_BYTES)
+        try:
+            length = int(self.headers.get("Content-Length") or 0)
+        except ValueError:
+            return self._send_json(400, {"error": "invalid Content-Length"})
+        # A negative length would make rfile.read(-1) block this thread until the client hangs up.
+        length = max(0, min(length, MAX_BODY_BYTES))
         body = self.rfile.read(length).decode("utf-8", errors="replace") if length else ""
         _store("http", f"{self.path}\n{body}")
         self._send_json(200, {"received": True})

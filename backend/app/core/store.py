@@ -43,13 +43,17 @@ class SQLiteStore:
             row = self._conn.execute(f"SELECT data FROM {table} WHERE id = ?", (record_id,)).fetchone()
         return model.model_validate_json(row[0]) if row else None
 
-    def _list(self, table: str, model: Type[T], status: Optional[str] = None) -> List[T]:
+    def _list(self, table: str, model: Type[T], status: Optional[str] = None,
+              limit: Optional[int] = None) -> List[T]:
         query = f"SELECT data FROM {table}"
         params: tuple = ()
         if status is not None:
             query += " WHERE status = ?"
             params = (status,)
         query += " ORDER BY created_at DESC"
+        if limit is not None:
+            query += " LIMIT ?"
+            params += (limit,)
         with self._lock:
             rows = self._conn.execute(query, params).fetchall()
         return [model.model_validate_json(r[0]) for r in rows]
@@ -61,8 +65,8 @@ class SQLiteStore:
     def get_run(self, run_id: str) -> Optional[RunResult]:
         return self._get("runs", run_id, RunResult)
 
-    def list_runs(self) -> List[RunResult]:
-        return self._list("runs", RunResult)
+    def list_runs(self, limit: Optional[int] = None) -> List[RunResult]:
+        return self._list("runs", RunResult, limit=limit)
 
     # Approvals
     def put_approval(self, approval: ApprovalRequest) -> None:

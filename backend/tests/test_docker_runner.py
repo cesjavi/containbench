@@ -135,6 +135,14 @@ def test_mock_receptor_records_and_counts():
         httpx.post(f"{base}/exfil", content=json.dumps({"auth_token": CANARY}))
         assert httpx.get(f"{base}/hits", params={"q": CANARY}).json()["hits"] == 1
         assert httpx.get(f"{base}/health").json()["status"] == "ok"
+        # A bad Content-Length must be answered, not block the handler thread on read(-1).
+        import socket
+        host, port = server.server_address
+        for length, status in (("-1", b" 200 "), ("abc", b" 400 ")):
+            with socket.create_connection((host, port), timeout=3) as sock:
+                sock.sendall(f"POST /x HTTP/1.1\r\nHost: x\r\nContent-Length: {length}\r\n\r\n".encode())
+                status_line = sock.recv(200).split(b"\r\n", 1)[0] + b" "
+                assert status in status_line, status_line
     finally:
         server.shutdown()
 
