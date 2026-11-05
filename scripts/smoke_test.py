@@ -14,6 +14,7 @@ Exit code 0 = every check passed. Stdlib only, so it runs anywhere python3 does.
 import json
 import os
 import sys
+import time
 import urllib.error
 import urllib.request
 
@@ -54,8 +55,20 @@ class Report:
         return ok
 
 
+def _wait_for_backend(seconds=60):
+    """Right after `docker compose up` the port accepts connections before uvicorn is ready."""
+    deadline = time.monotonic() + seconds
+    while True:
+        try:
+            return _request("GET", "/health")
+        except (urllib.error.URLError, ConnectionError, OSError):
+            if time.monotonic() >= deadline:
+                raise
+            time.sleep(2)
+
+
 def run(report):
-    status, health = _request("GET", "/health")
+    status, health = _wait_for_backend()
     report.check(status == 200, f"GET /health -> {status}")
 
     print("\nScenario verdicts (permissive / hardened):")
@@ -113,8 +126,8 @@ def main():
     report = Report()
     try:
         run(report)
-    except urllib.error.URLError as e:
-        print(f"\nCannot reach the API: {e}. Is the backend running?")
+    except (urllib.error.URLError, ConnectionError, OSError) as e:
+        print(f"\nCannot reach the API: {e}. Is the backend running? (docker compose ps)")
         return 2
     print()
     if report.failures:
