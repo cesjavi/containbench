@@ -23,6 +23,7 @@ import {
 } from './types';
 import { ToastProvider, useToast } from './components/ui/Toast';
 import { LiveExecutionModal } from './components/ui/LiveExecutionModal';
+import { SplashScreen } from './components/ui/SplashScreen';
 import { Header } from './components/layout/Header';
 import { NavigationTabs, TabKey } from './components/layout/NavigationTabs';
 import { ScenarioGrid } from './components/scenarios/ScenarioGrid';
@@ -86,6 +87,10 @@ function MainApp() {
   const [comparison, setComparison] = useState<ComparisonResult | null>(null);
   const [comparing, setComparing] = useState(false);
 
+  // Splash & Initial Loading State
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [splashDone, setSplashDone] = useState(false);
+
   // Initial Load
   const loadData = useCallback(async () => {
     const load = async <T,>(fetcher: () => Promise<T>, apply: (value: T) => void, label: string) => {
@@ -96,21 +101,25 @@ function MainApp() {
       }
     };
 
-    await Promise.all([
-      load(fetchScenarios, setScenarios, 'scenarios'),
-      load(fetchPolicies, setPolicies, 'policies'),
-      load(
-        fetchRuns,
-        (r) => {
-          setRuns(r);
-          if (r.length > 0) setSelectedRun((prev) => prev ?? r[0]);
-        },
-        'runs'
-      ),
-      load(fetchVultrStatus, setVultrStatus, 'Vultr status'),
-      load(fetchPrompts, setPromptsData, 'prompts'),
-      load(fetchApprovals, setApprovals, 'approvals'),
-    ]);
+    try {
+      await Promise.all([
+        load(fetchScenarios, setScenarios, 'scenarios'),
+        load(fetchPolicies, setPolicies, 'policies'),
+        load(
+          fetchRuns,
+          (r) => {
+            setRuns(r);
+            if (r.length > 0) setSelectedRun((prev) => prev ?? r[0]);
+          },
+          'runs'
+        ),
+        load(fetchVultrStatus, setVultrStatus, 'Vultr status'),
+        load(fetchPrompts, setPromptsData, 'prompts'),
+        load(fetchApprovals, setApprovals, 'approvals'),
+      ]);
+    } finally {
+      setInitialLoading(false);
+    }
   }, []);
 
   useEffect(() => {
@@ -458,6 +467,14 @@ function MainApp() {
         scenarioId={activeExecutionInfo?.scenarioId}
         policyName={activeExecutionInfo?.policyName}
       />
+
+      {/* Initial Application Splash Screen */}
+      {!splashDone && (
+        <SplashScreen
+          isLoading={initialLoading}
+          onFinish={() => setSplashDone(true)}
+        />
+      )}
     </div>
   );
 }
