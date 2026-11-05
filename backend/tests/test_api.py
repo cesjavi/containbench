@@ -128,3 +128,13 @@ def test_list_runs_is_bounded():
         client.post("/api/runs", json={"scenario_id": "CB-005", "policy_id": "hardened"})
     assert len(client.get("/api/runs", params={"limit": 2}).json()) == 2
     assert client.get("/api/runs", params={"limit": 0}).status_code == 422
+
+
+def test_llm_agent_info_names_the_provider_without_leaking_the_url(monkeypatch):
+    from app.api import routes
+    from app.config import settings
+    monkeypatch.setattr(settings, "LLM_AGENT_BASE_URL", "https://api.vultrinference.com/v1")
+    monkeypatch.setattr(settings, "LLM_AGENT_MODEL", "qwen3.8-27b")
+    assert routes.llm_agent_info() == {"model": "qwen3.8-27b", "provider": "vultr"}
+    monkeypatch.setattr(settings, "LLM_AGENT_BASE_URL", "http://host.docker.internal:11434/v1")
+    assert routes.llm_agent_info()["provider"] == "local"

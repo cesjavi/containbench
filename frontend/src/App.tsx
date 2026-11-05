@@ -34,8 +34,11 @@ import {
   fetchApprovals,
   decideApproval,
   generateAdversaryStimulus,
-  generateExecutionPlan
+  generateExecutionPlan,
+  VultrStatus
 } from './api';
+
+const LLM_AGENT = 'llm';
 import { ScenarioDefinition, PolicyConfig, RunResult, ComparisonResult, ApprovalRequest } from './types';
 
 export default function App() {
@@ -56,7 +59,9 @@ export default function App() {
   const [orchStimulus, setOrchStimulus] = useState<any | null>(null);
   const [orchPlan, setOrchPlan] = useState<any | null>(null);
   const [orchLoading, setOrchLoading] = useState<'stimulus' | 'plan' | null>(null);
-  const [vultrStatus, setVultrStatus] = useState<{ connected: boolean; status: string; message?: string } | null>(null);
+  const [vultrStatus, setVultrStatus] = useState<VultrStatus | null>(null);
+  const llmAgent = vultrStatus?.agent;
+  const llmAgentLabel = llmAgent?.provider === 'vultr' ? 'LLM (Vultr)' : 'LLM (Local)';
 
   // Prompts state
   const [promptsData, setPromptsData] = useState<{
@@ -70,7 +75,8 @@ export default function App() {
   const [running, setRunning] = useState(false);
   const [modalScenario, setModalScenario] = useState<ScenarioDefinition | null>(null);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>('hardened');
-  const [agentEndpoint, setAgentEndpoint] = useState<string>('');
+  // The built-in LLM agent is the default; on the Vultr deployment it calls Vultr Serverless Inference.
+  const [agentEndpoint, setAgentEndpoint] = useState<string>(LLM_AGENT);
 
   // A/B Comparison state
   const [compRunA, setCompRunA] = useState<string>('');
@@ -186,9 +192,9 @@ export default function App() {
     setRunning(true);
     try {
       // Each run is listed as soon as it exists, so a failure in the second one does not hide the first.
-      const runA = await createRun(scenarioId, 'baseline_permissive');
+      const runA = await createRun(scenarioId, 'baseline_permissive', LLM_AGENT);
       setRuns(prev => [runA, ...prev]);
-      const runB = await createRun(scenarioId, 'hardened');
+      const runB = await createRun(scenarioId, 'hardened', LLM_AGENT);
       setRuns(prev => [runB, ...prev]);
       setCompRunA(runA.id);
       setCompRunB(runB.id);
@@ -1115,14 +1121,14 @@ export default function App() {
                   <div className="flex gap-1.5">
                     <button
                       type="button"
-                      onClick={() => setAgentEndpoint('ollama')}
+                      onClick={() => setAgentEndpoint(LLM_AGENT)}
                       className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold transition ${
-                        agentEndpoint === 'ollama'
+                        agentEndpoint === LLM_AGENT
                           ? 'bg-teal-500 text-slate-950 font-bold'
                           : 'bg-slate-800 text-teal-400 hover:bg-slate-700'
                       }`}
                     >
-                      🤖 Ollama (Local)
+                      🤖 {llmAgentLabel}
                     </button>
                     <button
                       type="button"
@@ -1140,11 +1146,11 @@ export default function App() {
                 <input
                   value={agentEndpoint}
                   onChange={(e) => setAgentEndpoint(e.target.value)}
-                  placeholder="ollama o http://localhost:9000/act"
+                  placeholder="llm o http://localhost:9000/act"
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white font-mono"
                 />
                 <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                  Selecciona <strong className="text-teal-400">🤖 Ollama (Local)</strong> para crash-testear tu modelo local (qwen3:4b), o déjalo vacío para el agente de referencia.
+                  <strong className="text-teal-400">🤖 {llmAgentLabel}</strong>: un LLM real decide las acciones{llmAgent ? ` (${llmAgent.model})` : ''}. Vacío = agente de referencia (peor caso guionado).
                 </p>
               </div>
             </div>

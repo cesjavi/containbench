@@ -25,7 +25,11 @@ export async function fetchPolicies(): Promise<PolicyConfig[]> {
   return res.json();
 }
 
-export async function fetchVultrStatus(): Promise<{ connected: boolean; status: string; message?: string }> {
+export interface LlmAgentInfo { model: string; provider: 'vultr' | 'local' }
+
+export interface VultrStatus { connected: boolean; status: string; message?: string; agent?: LlmAgentInfo }
+
+export async function fetchVultrStatus(): Promise<VultrStatus> {
   try {
     const res = await fetch(`${API_BASE}/vultr/status`);
     if (!res.ok) return { connected: false, status: 'error' };

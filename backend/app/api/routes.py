@@ -28,6 +28,7 @@ from app.core.prompt_manager import prompt_manager
 from app.agents import get_agent
 from app.agents.http_agent import validate_agent_endpoint
 from app.api.security import require_api_key, run_slot
+from app.config import settings
 from app.runners import get_runner
 
 router = APIRouter(prefix="/api", dependencies=[Depends(require_api_key)])
@@ -79,8 +80,17 @@ async def list_policies():
 
 @router.get("/vultr/status")
 async def get_vultr_status():
-    """Checks the status of Vultr Serverless Inference."""
-    return await vultr_client.check_health()
+    """Checks the status of Vultr Serverless Inference and says which LLM backs the agent under test."""
+    status = dict(await vultr_client.check_health())
+    status["agent"] = llm_agent_info()
+    return status
+
+
+def llm_agent_info() -> Dict[str, str]:
+    """Model and provider of the built-in LLM agent; the base URL and key are never exposed."""
+    base = settings.LLM_AGENT_BASE_URL.lower()
+    provider = "vultr" if "vultrinference.com" in base else "local"
+    return {"model": settings.LLM_AGENT_MODEL, "provider": provider}
 
 @router.post("/runs", response_model=RunResult)
 async def create_run(request: RunRequest):

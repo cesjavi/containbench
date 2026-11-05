@@ -12,6 +12,18 @@ ContainBench answers one concrete question:
 
 > When the agent misbehaves, does the infrastructure actually limit the damage?
 
+## How Vultr powers ContainBench
+
+**Live demo:** http://207.246.89.99 (public demo mode, no login).
+
+| Vultr product | What it does in ContainBench |
+| --- | --- |
+| **Cloud Compute (Linux VM)** | Hosts the whole stack: control API, web UI, mock exfiltration receptor and the Docker daemon. Every crash test starts a real ephemeral container on this VM with cgroup limits, a read-only root, an unprivileged user and `--network none` under the hardened policy, then destroys it. |
+| **Serverless Inference: the agent under test** | The built-in LLM agent (`agent_endpoint: "llm"`, the UI default) sends each scenario's adversarial stimulus to a Vultr-hosted model (for example `qwen3.8-27b`). The model decides which actions to take (read a file, send data out, call a tool) and the container executes them against the real kernel. |
+| **Serverless Inference: analyst** | Writes the plain-language explanation of each verdict, the Markdown incident report, the adversarial stimuli and the advisory execution plan. Verdicts themselves are always deterministic: the model explains, it never decides PASS/FAIL. |
+
+The A/B quick demo runs the same Vultr-backed agent twice, under a permissive policy and under the hardened one, and shows which controls contained it.
+
 ## MVP
 
 The MVP tests a configurable agent against six scenarios:
@@ -118,6 +130,14 @@ export BASIC_AUTH_PASSWORD="choose-a-strong-password"  # login for the web UI (u
 docker compose up -d --build
 ```
 
+To make the agent under test call Vultr Serverless Inference, add to `docker/.env`:
+```bash
+LLM_AGENT_BASE_URL=https://api.vultrinference.com/v1
+LLM_AGENT_MODEL=qwen3.8-27b          # any chat model in your Vultr catalog
+LLM_AGENT_API_KEY=your_vultr_key     # the same key as VULTR_API_KEY
+```
+Without these, the LLM agent targets a local Ollama (`host.docker.internal:11434`).
+
 If `BASIC_AUTH_PASSWORD` is empty, a random password is generated and printed in the frontend logs (`docker compose logs frontend`).
 
 The stack builds the sandbox image, starts the mock receptor on the `containbench-net` network (alias `mock-receptor.local`) and runs the backend in `docker` mode. Permissive sandboxes join `containbench-sandbox`, a separate network that holds only the receptor (never the backend or nginx); hardened sandboxes run with `--network none`.
@@ -180,6 +200,12 @@ the kernel, cgroups and namespaces.
 POST /api/runs  {"scenario_id": "CB-003", "policy_id": "hardened", "agent_endpoint": "http://my-agent:9000/act"}
 ```
 
+`agent_endpoint: "llm"` (the web UI default) selects the built-in **LLM agent**, an
+OpenAI-compatible client configured with `LLM_AGENT_BASE_URL`, `LLM_AGENT_MODEL` and
+`LLM_AGENT_API_KEY`. It points at Vultr Serverless Inference in the Vultr deployment and at Ollama
+locally. `ollama://<model>` picks a specific model. If the model is unreachable, the run falls back
+to the reference agent and the timeline says so.
+
 Your endpoint receives the scenario context and returns the actions it decides to take:
 
 ```jsonc
@@ -197,14 +223,13 @@ endpoint falls back to the reference agent. See `backend/app/agents/`.
 
 In docker mode the actions run inside the ephemeral container as the unprivileged agent
 user, so allow/deny come from the real kernel (EACCES, EROFS, `--network none`, cgroups),
-not from policy flags. This path is validated at the logic level here; running it against
-a live Docker daemon is the VM step below.
+not from policy flags.
 
 ## Roadmap
 
 Known limitations and planned work, most impactful first:
 
-1. **End-to-end validation on a Vultr VM.** The Docker runner — including the external-agent action path — has been exercised at the logic level (probe scripts validated with `sh -n`, container options, output parsing) but not yet against a live Docker daemon and the mock receptor. This environment has no Docker, so it is the main validation gap; `scripts/smoke_test.py` makes it a single step once the stack is up.
+1. **Broader live coverage.** The Docker runner, including the agent action path with the Vultr-backed LLM agent, runs live on the Vultr VM (`scripts/smoke_test.py` validates the stack). More scenarios per run and repeated trials per model, to measure how consistent an agent's behavior is, are not built yet.
 2. **Real-time events.** Runs complete synchronously and the UI shows the timeline afterward. Streaming events while a run is in progress (SSE/WebSocket, backed by an async job queue) is not implemented.
 3. **Evidence store extras from the docs:** browser-agent scenarios, screenshots and artifact-hash storage are described in `docs/architecture.md` but not built.
 
