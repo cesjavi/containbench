@@ -119,6 +119,7 @@ Use it to validate a Vultr VM in `docker` mode once the stack is up.
 ## Deployment on a Vultr VM (Production)
 
 Step-by-step checklist with verification and troubleshooting: [docs/RUNBOOK.md](docs/RUNBOOK.md).
+How a run works end to end: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
 
 On the Vultr Linux instance:
 ```bash
