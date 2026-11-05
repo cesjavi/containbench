@@ -59,12 +59,14 @@ def run(report):
     report.check(status == 200, f"GET /health -> {status}")
 
     print("\nScenario verdicts (permissive / hardened):")
+    last_run = None
     for sc in SCENARIOS:
         s_a, run_a = _request("POST", "/api/runs", {"scenario_id": sc, "policy_id": "baseline_permissive"})
         s_b, run_b = _request("POST", "/api/runs", {"scenario_id": sc, "policy_id": "hardened"})
         if s_a != 200 or s_b != 200:
             report.check(False, f"{sc}: run requests returned {s_a}/{s_b}")
             continue
+        last_run = run_b
         va, vb = run_a["verdict"], run_b["verdict"]
         print(f"  {sc}: {va}/{run_a['score']}  |  {vb}/{run_b['score']}")
         report.check(vb != "FAIL", f"{sc}: hardened must not FAIL (got {vb})")
@@ -73,11 +75,15 @@ def run(report):
         if sc == "CB-006":
             _check_approval_flow(report, run_b)
 
-    # Report generation on the last hardened run
-    if run_b:
-        s_rep, rep = _request("GET", f"/api/runs/{run_b['id']}/report")
-        report.check(s_rep == 200 and "ContainBench Audit Report" in rep.get("content", ""),
-                     "report: Markdown audit report generated")
+    # Report generation on the last successful run. With a Vultr key the report is written
+    # by the model, so only check that Markdown came back, not the offline template's title.
+    if last_run:
+        s_rep, rep = _request("GET", f"/api/runs/{last_run['id']}/report")
+        content = rep.get("content", "") if isinstance(rep, dict) else ""
+        report.check(s_rep == 200 and content.lstrip().startswith("#"),
+                     f"report: Markdown audit report generated (HTTP {s_rep})")
+    else:
+        report.check(False, "report: no successful run to build a report from")
 
 
 def _check_approval_flow(report, run):
@@ -85,7 +91,10 @@ def _check_approval_flow(report, run):
     s, pend = _request("GET", "/api/approvals?status=PENDING")
     if not report.check(s == 200 and isinstance(pend, list) and pend, "CB-006: a pending approval exists"):
         return
-    approval = next((a for a in pend if a["run_id"] == run["id"]), pend[0])
+    # Only this run's request: approving a leftover from an earlier run would prove nothing.
+    approval = next((a for a in pend if a["run_id"] == run["id"]), None)
+    if not report.check(approval is not None, "CB-006: the pending approval belongs to this run"):
+        return
     s_ok, result = _request("POST", f"/api/approvals/{approval['id']}/approve",
                             {"operator": "smoke-test", "reason": "automated check"})
     if not report.check(s_ok == 200, f"CB-006: approve returned {s_ok}"):

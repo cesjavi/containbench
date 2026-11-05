@@ -83,27 +83,25 @@ export default function App() {
   }, []);
 
   const loadData = async () => {
-    try {
-      const [sc, pol, r, v, pr, ap] = await Promise.all([
-        fetchScenarios(),
-        fetchPolicies(),
-        fetchRuns(),
-        fetchVultrStatus(),
-        fetchPrompts(),
-        fetchApprovals()
-      ]);
-      setScenarios(sc);
-      setPolicies(pol);
-      setRuns(r);
-      setVultrStatus(v);
-      setPromptsData(pr);
-      setApprovals(ap);
-      if (r.length > 0 && !selectedRun) {
-        setSelectedRun(r[0]);
+    // Each panel loads independently: one failing endpoint must not leave the whole UI empty.
+    const load = async <T,>(fetcher: () => Promise<T>, apply: (value: T) => void, label: string) => {
+      try {
+        apply(await fetcher());
+      } catch (err) {
+        console.error(`Error loading ${label}:`, err);
       }
-    } catch (err) {
-      console.error("Error loading ContainBench data:", err);
-    }
+    };
+    await Promise.all([
+      load(fetchScenarios, setScenarios, 'scenarios'),
+      load(fetchPolicies, setPolicies, 'policies'),
+      load(fetchRuns, (r) => {
+        setRuns(r);
+        if (r.length > 0) setSelectedRun(prev => prev ?? r[0]);
+      }, 'runs'),
+      load(fetchVultrStatus, setVultrStatus, 'Vultr status'),
+      load(fetchPrompts, setPromptsData, 'prompts'),
+      load(fetchApprovals, setApprovals, 'approvals'),
+    ]);
   };
 
   const handleLaunchTest = async () => {
@@ -213,6 +211,7 @@ export default function App() {
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
+      URL.revokeObjectURL(url);
     } catch (err) {
       alert("Error downloading the report: " + err);
     }
@@ -1098,17 +1097,43 @@ export default function App() {
               </div>
 
               <div>
-                <label className="block text-xs font-semibold text-slate-300 mb-1.5">
-                  Agent endpoint <span className="text-slate-500 font-normal">(optional)</span>
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-xs font-semibold text-slate-300">
+                    Agente a Evaluar (Agent Under Test)
+                  </label>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setAgentEndpoint('ollama')}
+                      className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold transition ${
+                        agentEndpoint === 'ollama'
+                          ? 'bg-teal-500 text-slate-950 font-bold'
+                          : 'bg-slate-800 text-teal-400 hover:bg-slate-700'
+                      }`}
+                    >
+                      🤖 Ollama (Local)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setAgentEndpoint('')}
+                      className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold transition ${
+                        !agentEndpoint
+                          ? 'bg-teal-500 text-slate-950 font-bold'
+                          : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      }`}
+                    >
+                      🎯 Referencia
+                    </button>
+                  </div>
+                </div>
                 <input
                   value={agentEndpoint}
                   onChange={(e) => setAgentEndpoint(e.target.value)}
-                  placeholder="http://localhost:9000/act"
+                  placeholder="ollama o http://localhost:9000/act"
                   className="w-full bg-slate-950 border border-slate-700 rounded-lg p-2.5 text-xs text-white font-mono"
                 />
                 <p className="text-[11px] text-slate-500 mt-1 leading-snug">
-                  Your agent's HTTP endpoint. Leave empty to use the built-in reference agent (worst case).
+                  Selecciona <strong className="text-teal-400">🤖 Ollama (Local)</strong> para crash-testear tu modelo local (qwen3:4b), o déjalo vacío para el agente de referencia.
                 </p>
               </div>
             </div>

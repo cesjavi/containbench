@@ -26,6 +26,9 @@ def validate_agent_endpoint(endpoint: str) -> Optional[str]:
     localhost or a private network, so private addresses are allowed; set AGENT_ALLOWED_HOSTS
     to restrict which hosts the backend may call.
     """
+    if endpoint.lower() in ("ollama", "local", "llm") or endpoint.lower().startswith("ollama://"):
+        return None
+
     from app.config import settings
     url = urlparse(endpoint)
     if url.scheme not in ("http", "https") or not url.hostname:
