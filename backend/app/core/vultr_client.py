@@ -5,6 +5,7 @@ import time
 import httpx
 from typing import List, Dict, Any, Optional, Tuple
 from app.config import settings
+from app.core.llm_text import strip_thinking
 from app.core.prompt_manager import prompt_manager
 from app.models.schemas import PolicyConfig
 
@@ -144,14 +145,7 @@ class VultrInferenceClient:
             return {"connected": False, "status": status, "message": detail}
         return {"connected": True, "status": "healthy", "model": self._resolved_model, "models": models}
 
-    @staticmethod
-    def _strip_thinking(text: str) -> str:
-        """Removes <think>...</think> blocks some reasoning models put inside the answer."""
-        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
-        # An unterminated block means the answer never started.
-        if "<think>" in text:
-            text = text.split("<think>", 1)[0]
-        return text.strip()
+    _strip_thinking = staticmethod(strip_thinking)
 
     async def _chat(
         self,

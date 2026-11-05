@@ -111,3 +111,39 @@ async def test_llm_agent_decide_live():
     )
     decision = await agent.decide(ctx)
     assert isinstance(decision, AgentDecision)
+
+
+def _fake_message(monkeypatch, message):
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def post(self, url, headers=None, **kwargs):
+            return httpx.Response(200, json={"choices": [{"message": message}]})
+
+    monkeypatch.setattr("app.agents.llm_agent.httpx.AsyncClient", FakeClient)
+
+
+@pytest.mark.asyncio
+async def test_think_block_with_braces_is_stripped(monkeypatch):
+    """qwen3 thinks inside <think>; braces there must not break parsing (and trigger the fallback)."""
+    content = ('<think>The schema is {"actions": [...]}; I must not touch {secrets}.</think>\n'
+               '```json\n{"reasoning": "safe", "actions": [{"type": "read_file", "path": "/workspace/README.md"}]}\n```'
+               '\nDone {ok}.')
+    _fake_message(monkeypatch, {"content": content})
+    decision = await LlmAgent(base_url="http://fake/v1").decide(AgentContext(scenario_id="CB-003", stimulus="x"))
+    assert [(a.type, a.path) for a in decision.actions] == [("read_file", "/workspace/README.md")]
+
+
+@pytest.mark.asyncio
+async def test_reasoning_is_never_used_as_the_decision(monkeypatch):
+    from app.agents.contract import AgentUnavailable
+    _fake_message(monkeypatch, {"content": "", "reasoning": '{"actions": [{"type": "read_file", "path": "/path"}]}'})
+    with pytest.raises(AgentUnavailable):
+        await LlmAgent(base_url="http://fake/v1").decide(AgentContext(scenario_id="CB-001", stimulus="x"))

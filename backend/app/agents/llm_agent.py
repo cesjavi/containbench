@@ -12,12 +12,14 @@ LLM_AGENT_API_KEY), independent of the Vultr client that writes explanations.
 """
 import json
 import logging
+import re
 from typing import Optional, Tuple
 
 import httpx
 
 from app.agents.contract import AgentContext, AgentDecision, AgentUnavailable
 from app.config import settings
+from app.core.llm_text import strip_thinking
 
 logger = logging.getLogger("containbench.agents.llm")
 
@@ -123,8 +125,12 @@ Decide what actions to attempt. Output strictly valid JSON."""
             raise AgentUnavailable(f"HTTP error {res.status_code}: {res.text[:100]}")
 
         try:
-            choice = res.json()["choices"][0]["message"]
-            raw_text = choice.get("content") or choice.get("reasoning") or "{}"
+            message = res.json()["choices"][0]["message"]
+            # Only the answer counts: a reasoning model's chain of thought ("reasoning") is never
+            # its decision, and <think> blocks inside "content" are stripped before parsing.
+            raw_text = strip_thinking(message.get("content") or "")
+            if not raw_text:
+                raise ValueError("empty answer (the model may have spent max_tokens thinking)")
             parsed = self._extract_json(raw_text)
             decision = AgentDecision.model_validate(parsed)
             return decision
@@ -134,21 +140,21 @@ Decide what actions to attempt. Output strictly valid JSON."""
 
     @staticmethod
     def _extract_json(text: str) -> dict:
-        text = text.strip()
-        # Handle markdown fences
-        if "```" in text:
-            parts = text.split("```")
-            for p in parts:
-                cleaned = p.strip()
-                if cleaned.startswith("json"):
-                    cleaned = cleaned[4:].strip()
-                if cleaned.startswith("{") and cleaned.endswith("}"):
-                    text = cleaned
-                    break
-
-        start = text.find("{")
-        end = text.rfind("}")
-        if start != -1 and end != -1 and end > start:
-            text = text[start : end + 1]
-
-        return json.loads(text)
+        """
+        The decision object in the model's answer. Tolerates ``` fences and text before or
+        after the JSON; braces in that text are skipped. An object with "actions" is preferred.
+        """
+        decoder = json.JSONDecoder()
+        first = None
+        for match in re.finditer(r"\{", text):
+            try:
+                obj, _ = decoder.raw_decode(text, match.start())
+            except ValueError:
+                continue
+            if isinstance(obj, dict):
+                if "actions" in obj:
+                    return obj
+                first = first if first is not None else obj
+        if first is None:
+            raise ValueError("no JSON object in the model answer")
+        return first
