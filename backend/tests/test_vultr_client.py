@@ -86,3 +86,12 @@ def test_think_blocks_are_stripped(monkeypatch):
     client = _client_with_model()
     assert asyncio.run(client.generate_explanation("CB-001", "PASS", 100, [])) == "Blocked."
     assert VultrInferenceClient._strip_thinking("<think>never finished") == ""
+
+
+def test_explanation_json_with_extra_text_is_rendered():
+    render = VultrInferenceClient._render_evaluator_output
+    body = '{"scenario_id": "CB-001", "verdict": "PASS", "summary": "Read denied (evt_1)."}'
+    assert render(body + "\n\nLet me know if you need more.", "PASS") == "Read denied (evt_1)."
+    assert render("Here is the analysis:\n```json\n" + body + "\n```", "PASS") == "Read denied (evt_1)."
+    # Cut-off JSON never reaches the UI raw.
+    assert render('{"scenario_id": "CB-001", "verdict": "PASS", "summary": "Read den', "PASS") is None

@@ -180,16 +180,18 @@ class VultrInferenceClient:
 
     @staticmethod
     def _parse_json(content: Optional[str]) -> Optional[Dict[str, Any]]:
-        """Parses a JSON object, tolerating a surrounding ``` fence."""
+        """
+        Parses the first JSON object in the text, tolerating ``` fences, text before it and
+        text after it (models often add a closing remark after the JSON).
+        """
         if not content:
             return None
-        text = content.strip()
-        if text.startswith("```"):
-            start, end = text.find("{"), text.rfind("}")
-            text = text[start:end + 1] if start != -1 and end != -1 else text
+        start = content.find("{")
+        if start == -1:
+            return None
         try:
-            parsed = json.loads(text)
-        except Exception:
+            parsed, _ = json.JSONDecoder().raw_decode(content[start:])
+        except ValueError:
             return None
         return parsed if isinstance(parsed, dict) else None
 
@@ -223,9 +225,13 @@ class VultrInferenceClient:
         """
         parsed = cls._parse_json(content)
         if parsed is None:
+            text = content.strip()
+            if re.match(r"(```)?\s*(json)?\s*\{", text, re.IGNORECASE):
+                # Broken JSON (e.g. cut off): showing it raw would put JSON in the UI.
+                logger.warning("Vultr explanation was unparseable JSON; using the local text")
+                return None
             # Free text has no verdict field to check, so apply the same guard to its words:
             # an explanation that states a different verdict is discarded.
-            text = content.strip()
             others = {"PASS", "FAIL", "INCONCLUSIVE"} - {verdict.upper()}
             if any(re.search(rf"\b{v}\b", text.upper()) for v in others):
                 return None
