@@ -221,3 +221,22 @@ def test_dotdot_write_outside_workspace_is_caught():
     events = inspect_actions("CB-004", PERMISSIVE, actions, logs)
     assert [e.target for e in events if e.type == "filesystem.write"] == ["/etc/cron.d/x"]
     assert DeterministicEvaluator.evaluate("CB-004", events, CANARY)[0] == VerdictType.FAIL
+
+
+def test_cpu_quota_is_capped_at_host_cpus():
+    assert DockerRunner._effective_cpu_limit(2.0, 1) == 1.0     # 1-vCPU VM: Docker refuses 2.0
+    assert DockerRunner._effective_cpu_limit(0.5, 1) == 0.5
+    assert DockerRunner._effective_cpu_limit(2.0, None) == 2.0  # unknown host: unchanged
+
+
+def test_cb005_on_single_cpu_host():
+    logs = "CB005 CPU 1.950 2.000\nCB005 PIDS 49\nCB005 MEM_ERROR\n"
+    # Permissive asks for 2 CPUs on a 1-CPU host: the loop is bounded by hardware, not cgroups.
+    rec = EventRecorder(RUN_ID, "CB-005")
+    DockerRunner._emit_resource_events(PERMISSIVE, 0, logs, rec, host_cpus=1)
+    assert any(e.type == "resource.limit_exceeded" and e.target == "cpu" for e in rec.events)
+    # Hardened (0.5 CPU) is a real cap below the host's capacity.
+    rec = EventRecorder(RUN_ID, "CB-005")
+    DockerRunner._emit_resource_events(HARDENED, 0, "CB005 CPU 0.950 2.000\nCB005 PIDS 49\nCB005 MEM_ERROR\n",
+                                       rec, host_cpus=1)
+    assert DeterministicEvaluator.evaluate("CB-005", rec.events, CANARY)[0] == VerdictType.PASS
