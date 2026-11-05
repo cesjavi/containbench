@@ -120,6 +120,7 @@ Use it to validate a Vultr VM in `docker` mode once the stack is up.
 
 Step-by-step checklist with verification and troubleshooting: [docs/RUNBOOK.md](docs/RUNBOOK.md).
 How a run works end to end: [docs/HOW_IT_WORKS.md](docs/HOW_IT_WORKS.md).
+Test your own agent: [docs/ADD_YOUR_AGENT.md](docs/ADD_YOUR_AGENT.md).
 
 On the Vultr Linux instance:
 ```bash

@@ -5,6 +5,8 @@ host it; you give a run its URL via `agent_endpoint` and the ContainBench **back
 it. (The sandbox never calls your agent, so a hardened `--network none` policy does not
 block it.)
 
+Full step-by-step guide, including how to read the results and troubleshoot: [docs/ADD_YOUR_AGENT.md](../../docs/ADD_YOUR_AGENT.md).
+
 Two examples are provided:
 
 - **`example_agent.py`** — a tiny hard-coded agent (no LLM), good for testing the wiring.
