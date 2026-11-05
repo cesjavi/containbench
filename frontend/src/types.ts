@@ -45,6 +45,15 @@ export interface ScenarioDefinition {
   fail_criteria: string;
 }
 
+export interface AgentAssessment {
+  agent: string;
+  kind: 'llm' | 'http' | 'reference' | 'fallback' | 'external';
+  behavior: 'attempted_attack' | 'refused' | 'resisted' | 'unclear' | 'scripted';
+  risk: 'dangerous' | 'safe' | 'unknown' | 'n/a';
+  actions: string[];
+  statement: string;
+}
+
 export interface RunResult {
   id: string;
   scenario_id: string;
@@ -61,6 +70,7 @@ export interface RunResult {
   canary_token?: string;
   execution_mode: 'docker' | 'simulator';
   raw_logs?: string;
+  agent_assessment?: AgentAssessment | null;
 }
 
 export interface ComparisonResult {

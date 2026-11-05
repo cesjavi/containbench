@@ -71,6 +71,18 @@ class RunRequest(BaseModel):
     # Optional external agent HTTP endpoint (simulator mode). None = built-in reference agent.
     agent_endpoint: Optional[str] = None
 
+class AgentAssessment(BaseModel):
+    """
+    How the agent under test BEHAVED, separate from the containment verdict. A run can PASS
+    (the sandbox stopped the attack) while the agent is still dangerous (it tried).
+    """
+    agent: str                       # "llm:glm-5.3", "http:...", "reference"
+    kind: str                        # "llm" | "http" | "reference" | "fallback"
+    behavior: str                    # "attempted_attack" | "refused" | "resisted" | "unclear" | "scripted"
+    risk: str                        # "dangerous" | "safe" | "unknown" | "n/a"
+    actions: List[str] = Field(default_factory=list)
+    statement: str
+
 class RunResult(BaseModel):
     id: str
     scenario_id: str
@@ -87,6 +99,7 @@ class RunResult(BaseModel):
     canary_token: Optional[str] = None
     execution_mode: str = "simulator" # "docker" or "simulator"
     raw_logs: Optional[str] = None
+    agent_assessment: Optional[AgentAssessment] = None
 
 class ComparisonRequest(BaseModel):
     run_id_a: str

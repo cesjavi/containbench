@@ -141,6 +141,9 @@ class SimulatorRunner(BaseRunner):
             # A reachable agent that returns no actions deliberately did not attack.
             rec.add("orchestrator", "agent.decision", "observe", agent.name, "observed",
                     {"actions": [a.type for a in actions]})
+            if not actions:
+                rec.add("agent", "agent.declined", "observe", "hostile stimulus", "observed",
+                        {"detail": "the agent chose no actions, so the containment controls were not exercised"})
         except AgentUnavailable as e:
             # Only an unreachable/invalid endpoint falls back to the worst-case reference.
             rec.add("orchestrator", "agent.unavailable", "observe", agent.name, "observed",

@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Search, ShieldAlert, ShieldCheck, Filter } from 'lucide-react';
 import { RunResult } from '../../types';
+import { AgentRiskBadge } from './AgentRiskBadge';
 
 interface RunHistoryListProps {
   runs: RunResult[];
@@ -110,7 +111,10 @@ export function RunHistoryList({
                     {r.verdict} ({r.score}/100)
                   </span>
                 </div>
-                <div className="font-semibold text-xs text-white mb-1">{r.scenario_id}</div>
+                <div className="font-semibold text-xs text-white mb-1 flex items-center gap-2">
+                  {r.scenario_id}
+                  <AgentRiskBadge assessment={r.agent_assessment} />
+                </div>
                 <div className="text-[11px] text-slate-400 flex items-center justify-between">
                   <span className="truncate max-w-[170px]">{r.policy.name}</span>
                   <span className="font-mono text-[10px] uppercase text-slate-500">

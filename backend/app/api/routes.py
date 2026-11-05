@@ -21,7 +21,7 @@ from app.scenarios.registry import SCENARIOS, POLICIES
 from app.core.approvals import approval_service
 from app.core.store import store
 from app.core.canary import generate_canary_token
-from app.core.evaluator import DeterministicEvaluator
+from app.core.evaluator import DeterministicEvaluator, assess_agent
 from app.core.tool_dispatcher import ToolDispatcher
 from app.core.vultr_client import vultr_client
 from app.core.prompt_manager import prompt_manager
@@ -177,6 +177,7 @@ async def create_run(request: RunRequest):
         recommendations=recommendations,
         canary_token=canary,
         execution_mode=exec_mode,
+        agent_assessment=assess_agent(request.scenario_id, events, verdict),
         raw_logs=raw_logs
     )
 

@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { RunResult } from '../../types';
 import { EventTimeline } from '../timeline/EventTimeline';
+import { AgentAssessmentCard } from './AgentRiskBadge';
 
 interface RunDetailViewProps {
   run: RunResult;
@@ -88,6 +89,8 @@ export function RunDetailView({ run, onDownloadReport }: RunDetailViewProps) {
             </div>
           </div>
         </div>
+
+        <AgentAssessmentCard assessment={run.agent_assessment} />
 
         {/* Evidence Analysis (LLM Summary) */}
         <div className="bg-slate-950/70 p-4 rounded-xl border border-slate-800 text-sm leading-relaxed text-slate-200">

@@ -212,7 +212,15 @@ class DockerRunner(BaseRunner):
             )
 
             record_stimulus_delivery(rec, stimulus, {p: stimulus_files[p] for p in planted})
-            rec.add("agent", "process.spawned", "exec", f"scenario probe {scenario_id}", "observed")
+            if agent_actions is None:
+                rec.add("agent", "process.spawned", "exec", f"scenario probe {scenario_id}", "observed")
+            elif agent_actions:
+                rec.add("agent", "process.spawned", "exec", f"agent actions ({len(agent_actions)})", "observed",
+                        {"actions": [a.type for a in agent_actions]})
+            else:
+                # Nothing to execute: say so, instead of an empty process that reads as missing telemetry.
+                rec.add("agent", "agent.declined", "observe", "hostile stimulus", "observed",
+                        {"detail": "the agent chose no actions, so the containment controls were not exercised"})
 
             exit_code = None
             try:
@@ -236,6 +244,7 @@ class DockerRunner(BaseRunner):
                 self._inspect_actions(scenario_id, policy, run_id, agent_actions, exit_code, logs, canary_token, rec, nonce)
             else:
                 self._inspect_container_output(scenario_id, policy, run_id, exit_code, logs, canary_token, rec)
+            self._tag_kernel_enforcement(rec, network_mode)
 
         except docker.errors.ImageNotFound:
             rec.add("sandbox", "error", "exec", image_name, "deny", {"error": "Image not found, fallback required"})
@@ -252,6 +261,21 @@ class DockerRunner(BaseRunner):
                     pass
 
         return rec.result()
+
+    @staticmethod
+    def _tag_kernel_enforcement(rec: EventRecorder, network_mode: str) -> None:
+        """
+        In docker mode the "policy-engine" denials are enforced by the kernel, not by code that
+        inspects the action: say which mechanism, so reports do not have to guess.
+        """
+        for e in rec.events:
+            if e.decision != "deny" or "enforced_by" in e.metadata:
+                continue
+            if e.type == "filesystem.denied" or (e.type == "prompt.injected_action" and e.action in ("read", "write")):
+                e.metadata["enforced_by"] = "kernel: file permissions / read-only mount (EACCES/EROFS)"
+            elif e.type == "network.blocked":
+                e.metadata["enforced_by"] = ("kernel: no network namespace interface (--network none)"
+                                             if network_mode == "none" else "container network isolation")
 
     @staticmethod
     def _is_running(container) -> bool:
