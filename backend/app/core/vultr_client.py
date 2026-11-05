@@ -1,10 +1,13 @@
 import json
+import logging
 import re
 import httpx
 from typing import List, Dict, Any, Optional
 from app.config import settings
 from app.core.prompt_manager import prompt_manager
 from app.models.schemas import PolicyConfig
+
+logger = logging.getLogger("containbench.vultr")
 
 # Name fragments of non-chat models in Vultr's catalog (image, audio, speech, embeddings,
 # rerankers, retrievers, moderation). "auto" never picks these.
@@ -147,13 +150,19 @@ class VultrInferenceClient:
                     json=payload
                 )
                 if response.status_code != 200:
+                    # Failures fall back to local text, so leave the reason in the log.
+                    logger.warning("Vultr chat failed: model=%s HTTP %s: %s",
+                                   model, response.status_code, response.text[:300])
                     return None
                 msg = response.json()["choices"][0]["message"]
-                content = msg.get("content")
-                if not content and msg.get("reasoning"):
-                    content = msg["reasoning"]
+                # Reasoning models may put the answer in a separate field.
+                content = msg.get("content") or msg.get("reasoning_content") or msg.get("reasoning")
+                if not content:
+                    logger.warning("Vultr chat returned no content: model=%s finish_reason=%s",
+                                   model, response.json()["choices"][0].get("finish_reason"))
                 return content.strip() if content else None
-        except Exception:
+        except Exception as e:
+            logger.warning("Vultr chat error: model=%s %s: %s", model, type(e).__name__, e)
             return None
 
     @staticmethod
@@ -187,6 +196,8 @@ class VultrInferenceClient:
         user_content = prompt_manager.build_evaluator_user_prompt(scenario_id, verdict, score, events)
         content = await self._chat(sys_prompt, user_content, temperature=0.2, max_tokens=1000, json_mode=True)
         explanation = self._render_evaluator_output(content, verdict) if content else None
+        if content and not explanation:
+            logger.warning("Vultr explanation discarded (contradicts the %s verdict or is empty)", verdict)
         return explanation or self._fallback_explanation(scenario_id, verdict, score, events)
 
     @classmethod
