@@ -35,6 +35,11 @@ def validate_agent_endpoint(endpoint: str) -> Optional[str]:
     if url.scheme not in ("http", "https") or not url.hostname:
         return "agent_endpoint must be an http(s) URL with a host"
     allowed = settings.agent_allowed_hosts
+    if settings.DEMO_PUBLIC and not allowed:
+        # With no login in front of the API, an open agent_endpoint would let anyone make the
+        # backend call arbitrary URLs, including services on the VM itself.
+        return ("External agent endpoints are disabled in the public demo. "
+                "Leave the field empty to use the built-in reference agent.")
     if allowed and url.hostname.lower() not in allowed:
         return f"agent_endpoint host '{url.hostname}' is not in AGENT_ALLOWED_HOSTS"
     return None

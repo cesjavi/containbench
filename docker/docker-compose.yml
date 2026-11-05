@@ -52,6 +52,9 @@ services:
       - APPROVAL_SECRET=${APPROVAL_SECRET:-}
       - MAX_CONCURRENT_RUNS=2
       - PROMPTS_DIR=/app/prompts
+      # Public demo without login (judges): external agent endpoints are refused.
+      - DEMO_PUBLIC=${DEMO_PUBLIC:-false}
+      - AGENT_ALLOWED_HOSTS=${AGENT_ALLOWED_HOSTS:-}
       # Built-in LLM agent (agent_endpoint "ollama"): Ollama running on the VM itself.
       - LLM_AGENT_BASE_URL=${LLM_AGENT_BASE_URL:-http://host.docker.internal:11434/v1}
       - LLM_AGENT_MODEL=${LLM_AGENT_MODEL:-qwen3:4b}
@@ -87,6 +90,8 @@ services:
       # When empty, a random password is generated and printed in the frontend logs.
       - BASIC_AUTH_PASSWORD=${BASIC_AUTH_PASSWORD:-}
       - CONTAINBENCH_API_KEY=${CONTAINBENCH_API_KEY}
+      # true = no login (public demo); nginx still rate-limits runs per IP.
+      - DEMO_PUBLIC=${DEMO_PUBLIC:-false}
     depends_on:
       - backend
     networks:

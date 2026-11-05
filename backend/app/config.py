@@ -55,6 +55,9 @@ class Settings(BaseSettings):
     LLM_AGENT_BASE_URL: str = "http://localhost:11434/v1"
     LLM_AGENT_MODEL: str = "qwen3:4b"
     LLM_AGENT_API_KEY: str = ""
+    # Public demo (no login in front of the dashboard, e.g. for judges). External agent
+    # endpoints are refused unless AGENT_ALLOWED_HOSTS lists them; nginx rate-limits runs.
+    DEMO_PUBLIC: bool = False
     # Comma-separated hostnames the backend may call as agent_endpoint. Empty = any host.
     AGENT_ALLOWED_HOSTS: str = ""
 

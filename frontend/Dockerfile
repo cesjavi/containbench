@@ -16,6 +16,7 @@ RUN apk add --no-cache apache2-utils
 
 COPY --from=build /app/dist /usr/share/nginx/html
 COPY nginx.conf /etc/nginx/conf.d/default.conf
+COPY containbench-api-proxy.conf /etc/nginx/containbench-api-proxy.conf
 COPY docker-entrypoint.d/10-containbench-auth.sh /docker-entrypoint.d/10-containbench-auth.sh
 RUN sed -i 's/\r$//' /docker-entrypoint.d/10-containbench-auth.sh && \
     chmod +x /docker-entrypoint.d/10-containbench-auth.sh

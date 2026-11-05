@@ -82,3 +82,23 @@ def test_compare_rejects_mixed_scenarios_and_signs_gain():
     res = client.post("/api/runs/compare", json={"run_id_a": a["id"], "run_id_b": b["id"]})
     assert res.json()["containment_gain"].startswith("-")
     assert client.post("/api/runs/compare", json={"run_id_a": a["id"], "run_id_b": c["id"]}).status_code == 400
+
+
+def test_demo_public_refuses_external_agent_urls(monkeypatch):
+    from app.config import settings
+    from app.agents.http_agent import validate_agent_endpoint
+    monkeypatch.setattr(settings, "DEMO_PUBLIC", True)
+    monkeypatch.setattr(settings, "AGENT_ALLOWED_HOSTS", "")
+    assert validate_agent_endpoint("http://host.docker.internal:22/") is not None
+    res = client.post("/api/runs", json={"scenario_id": "CB-001", "agent_endpoint": "http://10.0.0.1/act"})
+    assert res.status_code == 400 and "public demo" in res.json()["detail"]
+    assert validate_agent_endpoint("ollama") is None            # server-configured LLM agent
+    # An explicit allowlist still works in the public demo.
+    monkeypatch.setattr(settings, "AGENT_ALLOWED_HOSTS", "my-agent")
+    assert validate_agent_endpoint("http://my-agent:9000/act") is None
+    assert validate_agent_endpoint("http://other:9000/act") is not None
+
+
+def test_custom_stimulus_is_bounded():
+    res = client.post("/api/runs", json={"scenario_id": "CB-001", "custom_stimulus": "x" * 20001})
+    assert res.status_code == 422

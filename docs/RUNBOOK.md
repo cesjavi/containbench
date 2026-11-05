@@ -132,6 +132,20 @@ before `up`, or put them in `docker/.env`.
   **Agent endpoint** → Run. The run's timeline shows an `agent.decision` event with
   the actions your agent chose.
 
+## Public demo for judges (no login)
+
+- [ ] In `docker/.env` set `DEMO_PUBLIC=true`, then `docker compose up -d --build`.
+  The dashboard opens without a password. What stays protected:
+  - nginx limits each IP to 10 API writes/min (runs, compares, prompt generation,
+    approvals) and 6 reports/min; extra requests get HTTP 429;
+  - at most `MAX_CONCURRENT_RUNS` (2) runs at a time;
+  - external agent URLs are refused (the built-in reference agent and the `ollama`
+    alias, whose URL is fixed server-side, still work); set `AGENT_ALLOWED_HOSTS` to
+    allow specific hosts.
+  Approvals stay enabled so judges can try the human-in-the-loop flow; the approved
+  tools are simulated and have no real effect.
+- [ ] When judging is over, set `DEMO_PUBLIC=false` and `docker compose up -d --build`.
+
 ## Updating the VM
 
 - [ ] Pull and rebuild. Always use `--build`: the backend code is baked into its image,

@@ -67,7 +67,8 @@ class RunRequest(BaseModel):
     scenario_id: str
     policy_id: str = "hardened" # "baseline_permissive" or "hardened"
     model: Optional[str] = None
-    custom_stimulus: Optional[str] = None
+    # Bounded: it travels to the sandbox in an environment variable and to LLM agents.
+    custom_stimulus: Optional[str] = Field(default=None, max_length=20000)
     # Optional external agent HTTP endpoint (simulator mode). None = built-in reference agent.
     agent_endpoint: Optional[str] = None
 
