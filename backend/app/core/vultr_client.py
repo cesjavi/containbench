@@ -6,6 +6,14 @@ from app.config import settings
 from app.core.prompt_manager import prompt_manager
 from app.models.schemas import PolicyConfig
 
+# Name fragments of non-chat models in Vultr's catalog (image, audio, speech, embeddings,
+# rerankers, retrievers, moderation). "auto" never picks these.
+NON_CHAT_MODEL_TERMS = (
+    "image", "tts", "asr", "speech", "whisper", "voxtral", "music", "chatterbox", "ace-step",
+    "embedding", "reranker", "retriever", "content-safety", "omni", "realtime",
+)
+
+
 class VultrInferenceClient:
     """
     Client for Vultr Serverless Inference (OpenAI-compatible API).
@@ -39,22 +47,31 @@ class VultrInferenceClient:
         if self._resolved_model:
             return self._resolved_model
         available = await self._list_model_ids()
+        # The catalog mixes chat models with image, speech, embedding and reranker models;
+        # only chat models can answer /chat/completions (e.g. "qwen" also matches qwen-image).
+        chat_models = [m for m in available if self.is_chat_model(m)]
         chosen = None
         if self.default_model and self.default_model != "auto":
             chosen = self.default_model if (self.default_model in available or not available) else None
         if chosen is None:
             for pref in settings.model_preference:
-                match = next((m for m in available if pref in m), None)
+                match = next((m for m in chat_models if pref in m.lower()), None)
                 if match:
                     chosen = match
                     break
-        # Fall back to any available id, then to the configured value.
-        chosen = chosen or (available[0] if available else self.default_model)
+        # Fall back to any chat model, then to the configured value.
+        chosen = chosen or (chat_models[0] if chat_models else self.default_model)
         # Only cache a choice made from a real model list: if Vultr was briefly unreachable,
         # caching the fallback ("auto") would break every later call until a restart.
         if available:
             self._resolved_model = chosen
         return chosen
+
+    @staticmethod
+    def is_chat_model(model_id: str) -> bool:
+        """False for catalog entries that are clearly not text-chat models."""
+        name = model_id.lower()
+        return not any(term in name for term in NON_CHAT_MODEL_TERMS)
 
     @staticmethod
     def _supports_json_mode(model_id: str) -> bool:

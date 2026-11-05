@@ -12,7 +12,8 @@ class Settings(BaseSettings):
     # set a concrete id to pin one.
     DEFAULT_MODEL: str = "auto"
     # Substrings tried in order when DEFAULT_MODEL is "auto" or unavailable.
-    MODEL_PREFERENCE: str = "llama-3.3,llama-3.1-70b,llama-3.1,llama-3,qwen,mixtral,mistral"
+    # Non-chat models (image, speech, embeddings...) are excluded before matching.
+    MODEL_PREFERENCE: str = "qwen3,deepseek,glm,llama-3.3,llama-3.1-70b,llama,mistral,mixtral"
 
     @property
     def model_preference(self) -> list:
