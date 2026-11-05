@@ -1,6 +1,7 @@
 import React from 'react';
 import { Play, RotateCw, Shield, Bot, Target, X } from 'lucide-react';
 import { ScenarioDefinition, PolicyConfig } from '../../types';
+import type { AgentModel } from '../../api';
 
 interface RunTestModalProps {
   scenario: ScenarioDefinition | null;
@@ -12,11 +13,13 @@ interface RunTestModalProps {
   running: boolean;
   llmAgentLabel: string;
   llmAgentModel?: string;
+  llmAgentModels?: AgentModel[];
   onClose: () => void;
   onLaunch: () => void;
 }
 
 const LLM_AGENT = 'llm';
+const LLM_MODEL_PREFIX = 'llm://';
 
 export function RunTestModal({
   scenario,
@@ -28,10 +31,19 @@ export function RunTestModal({
   running,
   llmAgentLabel,
   llmAgentModel,
+  llmAgentModels,
   onClose,
   onLaunch,
 }: RunTestModalProps) {
   if (!scenario) return null;
+
+  const models = llmAgentModels ?? [];
+  const chineseModels = models.filter((m) => m.chinese);
+  const otherModels = models.filter((m) => !m.chinese);
+  const isLlm = agentEndpoint === LLM_AGENT || agentEndpoint.startsWith(LLM_MODEL_PREFIX);
+  const selectedModel = agentEndpoint.startsWith(LLM_MODEL_PREFIX)
+    ? agentEndpoint.slice(LLM_MODEL_PREFIX.length)
+    : LLM_AGENT;
 
   return (
     <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm flex items-center justify-center p-4 animate-in fade-in duration-150">
@@ -104,7 +116,7 @@ export function RunTestModal({
                   type="button"
                   onClick={() => setAgentEndpoint(LLM_AGENT)}
                   className={`text-[10px] px-2 py-0.5 rounded font-mono font-semibold transition flex items-center gap-1 ${
-                    agentEndpoint === LLM_AGENT
+                    isLlm
                       ? 'bg-teal-500 text-slate-950 font-bold'
                       : 'bg-slate-800 text-teal-400 hover:bg-slate-700'
                   }`}
@@ -130,12 +142,46 @@ export function RunTestModal({
             <input
               value={agentEndpoint}
               onChange={(e) => setAgentEndpoint(e.target.value)}
-              placeholder="llm or http://localhost:9000/act"
+              placeholder="llm, llm://<model> or http://localhost:9000/act"
               className="w-full bg-slate-950 border border-slate-700 focus:border-teal-500 rounded-lg p-2.5 text-xs text-white font-mono outline-none"
             />
+            {isLlm && models.length > 0 && (
+              <div className="mt-2">
+                <label className="block text-[11px] font-semibold text-slate-400 mb-1">
+                  Model driving the agent
+                </label>
+                <select
+                  value={selectedModel}
+                  onChange={(e) =>
+                    setAgentEndpoint(e.target.value === LLM_AGENT ? LLM_AGENT : LLM_MODEL_PREFIX + e.target.value)
+                  }
+                  className="w-full bg-slate-950 border border-slate-700 focus:border-teal-500 rounded-lg p-2 text-xs text-white font-mono outline-none"
+                >
+                  <option value={LLM_AGENT}>Default{llmAgentModel ? ` (${llmAgentModel})` : ''}</option>
+                  {chineseModels.length > 0 && (
+                    <optgroup label="Chinese LLMs on Vultr">
+                      {chineseModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} · {m.lab}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                  {otherModels.length > 0 && (
+                    <optgroup label="Other models on Vultr">
+                      {otherModels.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name}
+                        </option>
+                      ))}
+                    </optgroup>
+                  )}
+                </select>
+              </div>
+            )}
             <p className="text-[11px] text-slate-500 mt-1 leading-snug">
               <strong className="text-teal-400">🤖 {llmAgentLabel}</strong>: an LLM decides actions
-              {llmAgentModel ? ` (${llmAgentModel})` : ''}. Empty = reference agent (scripted worst case).
+              {isLlm && selectedModel !== LLM_AGENT ? ` (${selectedModel})` : llmAgentModel ? ` (${llmAgentModel})` : ''}. Empty = reference agent (scripted worst case).
             </p>
           </div>
         </div>

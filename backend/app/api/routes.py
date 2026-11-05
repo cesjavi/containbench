@@ -27,6 +27,7 @@ from app.core.vultr_client import vultr_client
 from app.core.prompt_manager import prompt_manager
 from app.agents import get_agent
 from app.agents.http_agent import validate_agent_endpoint
+from app.agents.model_catalog import agent_models
 from app.api.security import require_api_key, run_slot
 from app.config import settings
 from app.runners import get_runner
@@ -83,6 +84,9 @@ async def get_vultr_status():
     """Checks the status of Vultr Serverless Inference and says which LLM backs the agent under test."""
     status = dict(await vultr_client.check_health())
     status["agent"] = llm_agent_info()
+    if status["agent"]["provider"] == "vultr":
+        # Models the LLM agent can be switched to with "llm://<id>", Chinese LLMs first.
+        status["agent"]["models"] = agent_models(status.get("models") or [])
     return status
 
 

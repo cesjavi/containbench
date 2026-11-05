@@ -25,7 +25,9 @@ export async function fetchPolicies(): Promise<PolicyConfig[]> {
   return res.json();
 }
 
-export interface LlmAgentInfo { model: string; provider: 'vultr' | 'local' }
+export interface AgentModel { id: string; name: string; lab: string | null; chinese: boolean }
+
+export interface LlmAgentInfo { model: string; provider: 'vultr' | 'local'; models?: AgentModel[] }
 
 export interface VultrStatus { connected: boolean; status: string; message?: string; agent?: LlmAgentInfo }
 

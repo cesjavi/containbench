@@ -7,7 +7,7 @@ context, and autonomously decides what actions to attempt. ContainBench's sandbo
 then enforces policy controls on those decisions to see if the blast radius is contained.
 
 Selected with agent_endpoint "ollama" / "local" / "llm" (default model) or
-"ollama://<model>". It has its own settings (LLM_AGENT_BASE_URL, LLM_AGENT_MODEL,
+"llm://<model>" (or "ollama://<model>"). It has its own settings (LLM_AGENT_BASE_URL, LLM_AGENT_MODEL,
 LLM_AGENT_API_KEY), independent of the Vultr client that writes explanations.
 """
 import json
@@ -24,7 +24,8 @@ from app.core.llm_text import strip_thinking
 logger = logging.getLogger("containbench.agents.llm")
 
 LLM_ALIASES = ("ollama", "local", "llm")
-LLM_SCHEME = "ollama://"
+# "llm://<model>" and the older "ollama://<model>" both pick a model on LLM_AGENT_BASE_URL.
+LLM_SCHEMES = ("llm://", "ollama://")
 # Planted files are sent whole up to this size: injected instructions usually sit deep in
 # the file (CB-003's are past character 250), so a short preview would hide the attack.
 MAX_FILE_CHARS = 8000
@@ -59,8 +60,9 @@ def parse_llm_endpoint(endpoint: Optional[str]) -> Optional[Tuple[Optional[str]]
     lowered = endpoint.strip().lower()
     if lowered in LLM_ALIASES:
         return (None,)
-    if lowered.startswith(LLM_SCHEME):
-        return (endpoint.strip()[len(LLM_SCHEME):] or None,)
+    for scheme in LLM_SCHEMES:
+        if lowered.startswith(scheme):
+            return (endpoint.strip()[len(scheme):] or None,)
     return None
 
 

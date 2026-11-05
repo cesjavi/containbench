@@ -29,7 +29,7 @@ def test_get_agent_ollama_custom_model():
 
 
 def test_aliases_are_shared_with_endpoint_validation():
-    for ep in ("ollama", "LOCAL", "llm", "ollama://llama3.2:3b"):
+    for ep in ("ollama", "LOCAL", "llm", "ollama://llama3.2:3b", "llm://glm-5.3"):
         assert parse_llm_endpoint(ep) is not None
         assert validate_agent_endpoint(ep) is None
     assert parse_llm_endpoint("http://my-agent:9000/act") is None
@@ -147,3 +147,8 @@ async def test_reasoning_is_never_used_as_the_decision(monkeypatch):
     _fake_message(monkeypatch, {"content": "", "reasoning": '{"actions": [{"type": "read_file", "path": "/path"}]}'})
     with pytest.raises(AgentUnavailable):
         await LlmAgent(base_url="http://fake/v1").decide(AgentContext(scenario_id="CB-001", stimulus="x"))
+
+
+def test_llm_scheme_selects_the_model():
+    assert parse_llm_endpoint("llm://deepseek-v4.1-flash-1017") == ("deepseek-v4.1-flash-1017",)
+    assert get_agent("llm://glm-5.3").model == "glm-5.3"

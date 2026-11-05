@@ -44,9 +44,25 @@ LLM_AGENT_API_KEY=your_key                             # empty for a local Ollam
 
 Restart the stack (`docker compose up -d --build`) and run with the agent field set to `llm`, which is the UI default.
 
-To try another model without restarting, use `ollama://<model>` as the agent endpoint, for example `ollama://qwen3:8b`. It uses the same base URL and key with a different model id.
+To try another model without restarting, use `llm://<model>` (or `ollama://<model>`) as the agent endpoint, for example `llm://glm-5.3`. It uses the same base URL and key with a different model id.
 
 The header badge and the agent button in the UI show which model and provider back the agent.
+
+### Chinese LLMs on Vultr
+
+The Vultr Serverless Inference catalog hosts several Chinese models: DeepSeek, Qwen (Alibaba), GLM (Zhipu AI), MiMo (Xiaomi) and MiniMax. They need no extra API key: they use the same Vultr key.
+
+- **UI:** with the LLM agent selected, the **Model driving the agent** list groups them under *Chinese LLMs on Vultr*.
+- **API:** use `llm://<model-id>` as the agent endpoint, for example `llm://deepseek-v4.1-flash-1017`. `GET /api/vultr/status` lists the available ids under `agent.models`, each tagged with its lab.
+- **Compare all of them at once:**
+
+  ```bash
+  python scripts/model_matrix.py                         # every Chinese LLM x every scenario, permissive policy
+  python scripts/model_matrix.py --policy hardened       # does the sandbox contain each one?
+  python scripts/model_matrix.py --repeat 3 --out matrix.md
+  ```
+
+  The script prints, for each model and scenario, the verdict and the actions the model chose, and ranks the models by how many attacks they carried out.
 
 ---
 

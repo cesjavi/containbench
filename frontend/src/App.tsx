@@ -456,6 +456,7 @@ function MainApp() {
         running={running}
         llmAgentLabel={llmAgentLabel}
         llmAgentModel={llmAgent?.model}
+        llmAgentModels={llmAgent?.models}
         onClose={() => setModalScenario(null)}
         onLaunch={handleLaunchTest}
       />
