@@ -56,7 +56,7 @@ export default function App() {
   const [orchStimulus, setOrchStimulus] = useState<any | null>(null);
   const [orchPlan, setOrchPlan] = useState<any | null>(null);
   const [orchLoading, setOrchLoading] = useState<'stimulus' | 'plan' | null>(null);
-  const [vultrStatus, setVultrStatus] = useState<{ connected: boolean; status: string } | null>(null);
+  const [vultrStatus, setVultrStatus] = useState<{ connected: boolean; status: string; message?: string } | null>(null);
 
   // Prompts state
   const [promptsData, setPromptsData] = useState<{
@@ -249,10 +249,19 @@ export default function App() {
 
         {/* Status and Action Buttons */}
         <div className="flex items-center gap-4">
-          <div className="hidden sm:flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60">
-            <span className={`h-2 w-2 rounded-full ${vultrStatus?.connected ? 'bg-emerald-400 animate-pulse' : 'bg-amber-400'}`} />
+          <div
+            className="hidden sm:flex items-center gap-2 text-xs font-mono px-3 py-1.5 rounded-lg bg-slate-800/80 border border-slate-700/60"
+            title={vultrStatus?.message || vultrStatus?.status || ''}
+          >
+            <span className={`h-2 w-2 rounded-full ${
+              vultrStatus?.connected ? 'bg-emerald-400 animate-pulse'
+                : vultrStatus?.status === 'auth_error' ? 'bg-rose-500' : 'bg-amber-400'
+            }`} />
             <span className="text-slate-300">Inference:</span>
-            <span className="text-slate-400">{vultrStatus?.connected ? 'Vultr Serverless' : 'Deterministic Mode'}</span>
+            <span className="text-slate-400">
+              {vultrStatus?.connected ? 'Vultr Serverless'
+                : vultrStatus?.status === 'auth_error' ? 'Vultr key rejected' : 'Deterministic Mode'}
+            </span>
           </div>
 
           <button

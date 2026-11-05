@@ -95,3 +95,54 @@ def test_explanation_json_with_extra_text_is_rendered():
     assert render("Here is the analysis:\n```json\n" + body + "\n```", "PASS") == "Read denied (evt_1)."
     # Cut-off JSON never reaches the UI raw.
     assert render('{"scenario_id": "CB-001", "verdict": "PASS", "summary": "Read den', "PASS") is None
+
+
+def _fake_vultr(monkeypatch, chat_status):
+    """Model list always answers (it is public); chat answers chat_status. Counts chat calls."""
+    import httpx
+    calls = {"chat": 0}
+
+    class FakeClient:
+        def __init__(self, *a, **kw):
+            pass
+
+        async def __aenter__(self):
+            return self
+
+        async def __aexit__(self, *a):
+            return False
+
+        async def get(self, url, **kw):
+            return httpx.Response(200, json={"data": [{"id": "qwen3.8-27b"}]})
+
+        async def post(self, url, **kw):
+            calls["chat"] += 1
+            if chat_status == 200:
+                return httpx.Response(200, json={"choices": [{"message": {"content": "p"}, "finish_reason": "length"}]})
+            return httpx.Response(chat_status, json={"error": {"message": "Invalid API key"}})
+
+    monkeypatch.setattr("app.core.vultr_client.httpx.AsyncClient", FakeClient)
+    return calls
+
+
+def test_health_reports_rejected_key_even_though_models_list(monkeypatch):
+    _fake_vultr(monkeypatch, 401)
+    status = asyncio.run(VultrInferenceClient(api_key="wrong", base_url="https://x/v1").check_health())
+    assert status["connected"] is False and status["status"] == "auth_error"
+
+
+def test_health_verifies_key_once_per_cache_window(monkeypatch):
+    calls = _fake_vultr(monkeypatch, 200)
+    client = VultrInferenceClient(api_key="good", base_url="https://x/v1")
+    first = asyncio.run(client.check_health())
+    asyncio.run(client.check_health())
+    assert first["connected"] is True and first["status"] == "healthy"
+    assert calls["chat"] == 1                      # second check used the cached result
+
+
+def test_real_401_flips_health_immediately(monkeypatch):
+    calls = _fake_vultr(monkeypatch, 200)
+    client = VultrInferenceClient(api_key="good", base_url="https://x/v1")
+    assert asyncio.run(client.check_health())["connected"] is True
+    client._record_auth(401)                       # e.g. the key was revoked mid-session
+    assert asyncio.run(client.check_health())["status"] == "auth_error"

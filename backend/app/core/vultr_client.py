@@ -1,8 +1,9 @@
 import json
 import logging
 import re
+import time
 import httpx
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any, Optional, Tuple
 from app.config import settings
 from app.core.prompt_manager import prompt_manager
 from app.models.schemas import PolicyConfig
@@ -15,6 +16,10 @@ NON_CHAT_MODEL_TERMS = (
     "image", "tts", "asr", "speech", "whisper", "voxtral", "music", "chatterbox", "ace-step",
     "embedding", "reranker", "retriever", "content-safety", "omni", "realtime",
 )
+
+
+# How long a verified (or rejected) key is trusted before the status check probes again.
+AUTH_CACHE_SECONDS = 600
 
 
 class VultrInferenceClient:
@@ -31,6 +36,8 @@ class VultrInferenceClient:
         self.api_key = raw_key
         self.default_model = settings.DEFAULT_MODEL
         self._resolved_model: Optional[str] = None
+        # (key accepted, detail, monotonic time) from the last chat call, or None if unknown.
+        self._auth: Optional[Tuple[bool, str, float]] = None
 
     async def _list_model_ids(self) -> List[str]:
         try:
@@ -81,8 +88,34 @@ class VultrInferenceClient:
         """Legacy llama2 chat endpoints reject response_format; modern models accept it."""
         return "llama2" not in model_id and "llama-2" not in model_id
 
+    def _record_auth(self, status_code: int) -> None:
+        """Remembers whether the key was accepted, from any chat call (probe or real)."""
+        if status_code in (401, 403):
+            self._auth = (False, f"Vultr rejected VULTR_API_KEY (HTTP {status_code}). Use the key from "
+                                 "Compute > Serverless Inference > your subscription > Overview.", time.monotonic())
+        elif status_code == 200:
+            self._auth = (True, "", time.monotonic())
+
+    async def _probe_auth(self) -> None:
+        """One-token chat call: the model list is public, so only a chat call proves the key works."""
+        model = await self.resolve_model()
+        async with httpx.AsyncClient(timeout=15.0) as client:
+            res = await client.post(
+                f"{self.base_url}/chat/completions",
+                headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
+                json={"model": model, "messages": [{"role": "user", "content": "ping"}], "max_tokens": 1},
+            )
+        if res.status_code in (200, 401, 403):
+            self._record_auth(res.status_code)
+        else:
+            self._auth = (False, f"Chat probe failed: HTTP {res.status_code}: {res.text[:200]}", time.monotonic())
+
     async def check_health(self) -> Dict[str, Any]:
-        """Checks connectivity with the Vultr endpoint."""
+        """
+        Checks that Vultr is reachable AND that the key is accepted. The model list answers
+        even with an invalid key, so the key is verified with a 1-token chat call, cached for
+        AUTH_CACHE_SECONDS (real chat calls refresh it too).
+        """
         if not self.api_key:
             return {
                 "connected": False,
@@ -96,23 +129,20 @@ class VultrInferenceClient:
                     f"{self.base_url}/models",
                     headers={"Authorization": f"Bearer {self.api_key}"}
                 )
-                if res.status_code == 200:
-                    return {
-                        "connected": True,
-                        "status": "healthy",
-                        "models": res.json().get("data", [])
-                    }
-                return {
-                    "connected": False,
-                    "status": f"http_{res.status_code}",
-                    "message": res.text
-                }
+            if res.status_code != 200:
+                return {"connected": False, "status": f"http_{res.status_code}", "message": res.text[:300]}
+            models = res.json().get("data", [])
+
+            if self._auth is None or time.monotonic() - self._auth[2] > AUTH_CACHE_SECONDS:
+                await self._probe_auth()
         except Exception as e:
-            return {
-                "connected": False,
-                "status": "error",
-                "message": str(e)
-            }
+            return {"connected": False, "status": "error", "message": f"{type(e).__name__}: {e}"}
+
+        ok, detail, _ = self._auth
+        if not ok:
+            status = "auth_error" if "rejected" in detail else "error"
+            return {"connected": False, "status": status, "message": detail}
+        return {"connected": True, "status": "healthy", "model": self._resolved_model, "models": models}
 
     @staticmethod
     def _strip_thinking(text: str) -> str:
@@ -158,6 +188,7 @@ class VultrInferenceClient:
                     },
                     json=payload
                 )
+                self._record_auth(response.status_code)
                 if response.status_code != 200:
                     # Failures fall back to local text, so leave the reason in the log.
                     logger.warning("Vultr chat failed: model=%s HTTP %s: %s",
