@@ -63,3 +63,4 @@ if __name__ == "__main__":
         print("Usage: python scripts/deploy_vultr.py <ROOT_PASSWORD>")
         sys.exit(1)
     deploy(sys.argv[1])
+

@@ -22,3 +22,6 @@ Thumbs.db
 
 # Local SQLite data
 backend/data/
+data/
+*.db
+*.sqlite3
