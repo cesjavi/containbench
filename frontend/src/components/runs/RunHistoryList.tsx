@@ -14,7 +14,7 @@ export function RunHistoryList({
   selectedRunId,
   onSelectRun,
 }: RunHistoryListProps) {
-  const [verdictFilter, setVerdictFilter] = useState<'all' | 'PASS' | 'FAIL'>('all');
+  const [verdictFilter, setVerdictFilter] = useState<'all' | 'PASS' | 'FAIL' | 'INCONCLUSIVE'>('all');
   const [searchQuery, setSearchQuery] = useState<string>('');
 
   const filteredRuns = useMemo(() => {
@@ -54,7 +54,7 @@ export function RunHistoryList({
 
         <div className="flex items-center gap-1.5">
           <Filter className="h-3.5 w-3.5 text-slate-500 ml-1 shrink-0" />
-          {(['all', 'PASS', 'FAIL'] as const).map((v) => (
+          {(['all', 'PASS', 'FAIL', 'INCONCLUSIVE'] as const).map((v) => (
             <button
               key={v}
               onClick={() => setVerdictFilter(v)}
@@ -64,11 +64,13 @@ export function RunHistoryList({
                     ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
                     : v === 'FAIL'
                     ? 'bg-rose-500/20 text-rose-300 border border-rose-500/30'
+                    : v === 'INCONCLUSIVE'
+                    ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30'
                     : 'bg-teal-500/20 text-teal-300 border border-teal-500/30'
                   : 'bg-slate-950 text-slate-400 hover:text-slate-200 border border-slate-800/80'
               }`}
             >
-              {v}
+              {v === 'INCONCLUSIVE' ? 'INCONCL.' : v}
             </button>
           ))}
         </div>

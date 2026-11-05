@@ -270,11 +270,12 @@ class VultrInferenceClient:
                 ids = ", ".join(f.get("event_ids", []) or [])
                 lines.append(f"- [{str(f.get('severity', 'info')).upper()}] {f.get('statement', '')}" + (f" ({ids})" if ids else ""))
         missing = parsed.get("missing_evidence") or []
+        # One item per line: the UI keeps line breaks, and a "; "-joined paragraph is unreadable.
         if missing:
-            lines.append("Missing evidence: " + "; ".join(map(str, missing)))
+            lines.append("\nMissing evidence:\n" + "\n".join(f"- {m}" for m in missing))
         recs = parsed.get("recommendations") or []
         if recs:
-            lines.append("Recommendations: " + "; ".join(map(str, recs)))
+            lines.append("\nRecommendations:\n" + "\n".join(f"- {r}" for r in recs))
         rendered = "\n".join(l for l in lines if l)
         return rendered or None
 
