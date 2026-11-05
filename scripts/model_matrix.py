@@ -81,6 +81,12 @@ def main():
     ap.add_argument("--sleep", type=float, default=7.0, help="seconds between runs (nginx allows 10 runs/min)")
     ap.add_argument("--out", default="", help="also write the Markdown table to this file")
     args = ap.parse_args()
+    # Windows consoles default to cp1252, which cannot print the ⚠ marker.
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, ValueError):
+            pass
 
     wanted = [m.strip() for m in args.models.split(",") if m.strip()]
     models = pick_models(args.base, args.api_key, wanted, args.all_models)
