@@ -207,3 +207,7 @@ Known limitations and planned work, most impactful first:
 1. **End-to-end validation on a Vultr VM.** The Docker runner — including the external-agent action path — has been exercised at the logic level (probe scripts validated with `sh -n`, container options, output parsing) but not yet against a live Docker daemon and the mock receptor. This environment has no Docker, so it is the main validation gap; `scripts/smoke_test.py` makes it a single step once the stack is up.
 2. **Real-time events.** Runs complete synchronously and the UI shows the timeline afterward. Streaming events while a run is in progress (SSE/WebSocket, backed by an async job queue) is not implemented.
 3. **Evidence store extras from the docs:** browser-agent scenarios, screenshots and artifact-hash storage are described in `docs/architecture.md` but not built.
+
+## License
+
+[MIT](LICENSE)
