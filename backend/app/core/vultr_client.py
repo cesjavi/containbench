@@ -114,6 +114,15 @@ class VultrInferenceClient:
                 "message": str(e)
             }
 
+    @staticmethod
+    def _strip_thinking(text: str) -> str:
+        """Removes <think>...</think> blocks some reasoning models put inside the answer."""
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL)
+        # An unterminated block means the answer never started.
+        if "<think>" in text:
+            text = text.split("<think>", 1)[0]
+        return text.strip()
+
     async def _chat(
         self,
         system_prompt: str,
@@ -121,7 +130,7 @@ class VultrInferenceClient:
         temperature: float,
         max_tokens: Optional[int] = None,
         json_mode: bool = False,
-        timeout: float = 20.0
+        timeout: float = 90.0
     ) -> Optional[str]:
         """Sends one chat completion. Returns the message text, or None on any failure."""
         if not self.api_key:
@@ -154,13 +163,17 @@ class VultrInferenceClient:
                     logger.warning("Vultr chat failed: model=%s HTTP %s: %s",
                                    model, response.status_code, response.text[:300])
                     return None
-                msg = response.json()["choices"][0]["message"]
-                # Reasoning models may put the answer in a separate field.
-                content = msg.get("content") or msg.get("reasoning_content") or msg.get("reasoning")
+                choice = response.json()["choices"][0]
+                # Only the answer counts. Reasoning models also return their chain of thought
+                # ("reasoning" / "reasoning_content"); it is never a usable answer, and when the
+                # token budget runs out mid-thought "content" is empty and only reasoning is left.
+                content = self._strip_thinking(choice["message"].get("content") or "")
                 if not content:
-                    logger.warning("Vultr chat returned no content: model=%s finish_reason=%s",
-                                   model, response.json()["choices"][0].get("finish_reason"))
-                return content.strip() if content else None
+                    logger.warning("Vultr chat returned no answer: model=%s finish_reason=%s "
+                                   "(a reasoning model may have used the whole max_tokens budget)",
+                                   model, choice.get("finish_reason"))
+                    return None
+                return content
         except Exception as e:
             logger.warning("Vultr chat error: model=%s %s: %s", model, type(e).__name__, e)
             return None
@@ -194,7 +207,8 @@ class VultrInferenceClient:
         """
         sys_prompt = system_prompt or prompt_manager.get_system_prompt("evaluator")
         user_content = prompt_manager.build_evaluator_user_prompt(scenario_id, verdict, score, events)
-        content = await self._chat(sys_prompt, user_content, temperature=0.2, max_tokens=1000, json_mode=True)
+        content = await self._chat(sys_prompt, user_content, temperature=0.2, max_tokens=4000, json_mode=True,
+                                  timeout=90.0)
         explanation = self._render_evaluator_output(content, verdict) if content else None
         if content and not explanation:
             logger.warning("Vultr explanation discarded (contradicts the %s verdict or is empty)", verdict)
@@ -239,7 +253,7 @@ class VultrInferenceClient:
         Falls back to the structured deterministic generator when Vultr is unavailable.
         """
         sys_prompt, user_content = prompt_manager.build_report_prompts(run)
-        content = await self._chat(sys_prompt, user_content, temperature=0.3, max_tokens=1500, timeout=30.0)
+        content = await self._chat(sys_prompt, user_content, temperature=0.3, max_tokens=6000, timeout=120.0)
         return content or prompt_manager.generate_offline_markdown_report(run)
 
     async def generate_adversary_stimulus(self, scenario_id: str, target_policy: str = "hardened") -> Dict[str, Any]:
