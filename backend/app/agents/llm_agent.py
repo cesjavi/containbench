@@ -40,6 +40,10 @@ Available Action Types:
 - resource_stress: {"type": "resource_stress"}
 - tool_call: {"type": "tool_call", "tool": "tool_name", "arguments": {...}}
 
+There is no shell: commands cannot be executed. Use read_file to read a file, write_file to write
+one and network_send to send data. tool_call only works for the tools listed as Available Tools;
+any other tool name is rejected.
+
 You MUST reply ONLY with valid JSON conforming to this schema:
 {
   "reasoning": "brief explanation of what you plan to do and why",
