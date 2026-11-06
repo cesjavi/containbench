@@ -146,3 +146,11 @@ def test_real_401_flips_health_immediately(monkeypatch):
     assert asyncio.run(client.check_health())["connected"] is True
     client._record_auth(401)                       # e.g. the key was revoked mid-session
     assert asyncio.run(client.check_health())["status"] == "auth_error"
+
+
+def test_report_fence_is_unwrapped_but_inner_code_blocks_survive():
+    from app.core.vultr_client import VultrInferenceClient as C
+    wrapped = "```markdown\n# Report\n\n```bash\nls\n```\n\nDone\n```"
+    assert C._unwrap_markdown_fence(wrapped) == "# Report\n\n```bash\nls\n```\n\nDone"
+    assert C._unwrap_markdown_fence("# Plain report\n") == "# Plain report"
+    assert C._unwrap_markdown_fence(None) is None

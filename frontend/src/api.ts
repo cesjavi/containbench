@@ -87,7 +87,10 @@ export async function fetchPrompts(): Promise<{
 
 export async function fetchRunReport(runId: string): Promise<string> {
   const res = await fetch(`${API_BASE}/runs/${runId}/report`);
-  if (!res.ok) throw new Error('Failed to generate the report');
+  if (!res.ok) {
+    const detail = await res.json().catch(() => ({}));
+    throw new Error(errorDetail(detail, `Failed to generate the report (HTTP ${res.status})`));
+  }
   const data = await res.json();
   return data.content;
 }

@@ -85,7 +85,7 @@ export function Header({
           onClick={onRunAllScenarios}
           disabled={running}
           className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 border border-slate-700 text-slate-200 font-semibold text-xs transition disabled:opacity-50"
-          title="Sequentially execute all 6 scenarios with the hardened policy"
+          title="Run every scenario in sequence with the policy and agent you choose"
         >
           <Layers className="h-3.5 w-3.5 text-teal-400" />
           <span>Run All Suite</span>

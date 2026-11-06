@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  Download,
+  FileText,
   ShieldCheck,
   ShieldAlert,
   Cpu,
@@ -16,10 +16,10 @@ import { AgentAssessmentCard } from './AgentRiskBadge';
 
 interface RunDetailViewProps {
   run: RunResult;
-  onDownloadReport: (runId: string) => void;
+  onOpenReport: (runId: string) => void;
 }
 
-export function RunDetailView({ run, onDownloadReport }: RunDetailViewProps) {
+export function RunDetailView({ run, onOpenReport }: RunDetailViewProps) {
   const [copiedCanary, setCopiedCanary] = useState(false);
 
   const copyCanary = () => {
@@ -58,12 +58,12 @@ export function RunDetailView({ run, onDownloadReport }: RunDetailViewProps) {
 
           <div className="flex items-center gap-4">
             <button
-              onClick={() => onDownloadReport(run.id)}
+              onClick={() => onOpenReport(run.id)}
               className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-teal-300 border border-slate-700 text-xs font-semibold transition"
-              title="Generate and download the Markdown audit report"
+              title="Generate the audit report and open it (it can be downloaded as Markdown)"
             >
-              <Download className="h-3.5 w-3.5" />
-              Download MD Report
+              <FileText className="h-3.5 w-3.5" />
+              View Report
             </button>
 
             <div className="text-right">

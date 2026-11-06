@@ -286,7 +286,17 @@ class VultrInferenceClient:
         """
         sys_prompt, user_content = prompt_manager.build_report_prompts(run)
         content = await self._chat(sys_prompt, user_content, temperature=0.3, max_tokens=6000, timeout=120.0)
+        content = self._unwrap_markdown_fence(content)
         return content or prompt_manager.generate_offline_markdown_report(run)
+
+    @staticmethod
+    def _unwrap_markdown_fence(content: Optional[str]) -> Optional[str]:
+        """Models often wrap the whole report in ```markdown ... ```; it would render as one code block."""
+        if not content:
+            return content
+        text = content.strip()
+        match = re.fullmatch(r"```(?:markdown|md)?[ \t]*\n(.*?)\n?```", text, flags=re.DOTALL | re.IGNORECASE)
+        return match.group(1).strip() if match else text
 
     async def generate_adversary_stimulus(self, scenario_id: str, target_policy: str = "hardened") -> Dict[str, Any]:
         """

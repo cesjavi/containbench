@@ -7,7 +7,6 @@ import {
   compareRuns,
   fetchVultrStatus,
   fetchPrompts,
-  fetchRunReport,
   fetchApprovals,
   decideApproval,
   generateAdversaryStimulus,
@@ -34,6 +33,9 @@ import { ApprovalsView } from './components/approvals/ApprovalsView';
 import { PromptsView } from './components/prompts/PromptsView';
 import { OrchestrationView } from './components/orchestration/OrchestrationView';
 import { RunTestModal } from './components/modals/RunTestModal';
+import { ReportModal } from './components/modals/ReportModal';
+import { agentLabel } from './components/modals/AgentPicker';
+import { SuiteRunModal, SuiteSummaryModal, SuiteEntry, SuiteSummary } from './components/modals/SuiteModals';
 
 const LLM_AGENT = 'llm';
 
@@ -80,6 +82,16 @@ function MainApp() {
   const [modalScenario, setModalScenario] = useState<ScenarioDefinition | null>(null);
   const [selectedPolicyId, setSelectedPolicyId] = useState<string>('hardened');
   const [agentEndpoint, setAgentEndpoint] = useState<string>(LLM_AGENT);
+
+  // Suite dialog, suite report and run report pop-ups
+  const [suiteDialogOpen, setSuiteDialogOpen] = useState(false);
+  const [suitePolicyId, setSuitePolicyId] = useState<string>('hardened');
+  const [suiteAgent, setSuiteAgent] = useState<string>(LLM_AGENT);
+  const [suiteSummary, setSuiteSummary] = useState<SuiteSummary | null>(null);
+  const [reportRunId, setReportRunId] = useState<string | null>(null);
+  const closeReport = useCallback(() => setReportRunId(null), []);
+  const closeSuiteDialog = useCallback(() => setSuiteDialogOpen(false), []);
+  const closeSuiteSummary = useCallback(() => setSuiteSummary(null), []);
 
   // A/B Comparison State
   const [compRunA, setCompRunA] = useState<string>('');
@@ -196,41 +208,50 @@ function MainApp() {
     }
   };
 
-  // Run Complete Suite (All Scenarios Sequentially)
+  // Run Complete Suite (all scenarios sequentially, with the policy and agent chosen in the dialog)
   const handleRunAllSuite = async () => {
-    if (scenarios.length === 0) return;
+    if (scenarios.length === 0 || running) return;
+    const pol = policies.find((p) => p.id === suitePolicyId);
+    const policyName = pol?.name || suitePolicyId;
+    const agent = agentLabel(suiteAgent, llmAgentLabel, llmAgent?.model);
+    setSuiteDialogOpen(false);
     setRunning(true);
-    toast.info('Suite Started', `Running all ${scenarios.length} scenarios with Hardened Policy...`);
+    toast.info('Suite Started', `Running ${scenarios.length} scenarios under ${policyName} with ${agent}...`);
 
-    let passed = 0;
-    let failed = 0;
-
+    const entries: SuiteEntry[] = [];
     for (let i = 0; i < scenarios.length; i++) {
       const sc = scenarios[i];
       setActiveExecutionInfo({
         customTitle: `Suite [${i + 1}/${scenarios.length}]: ${sc.id}`,
         scenarioId: sc.id,
-        policyName: 'Hardened Policy',
+        policyName,
       });
 
       try {
-        const newRun = await createRun(sc.id, 'hardened', LLM_AGENT);
+        const newRun = await createRun(sc.id, suitePolicyId, suiteAgent);
         setRuns((prev) => [newRun, ...prev]);
-        if (newRun.verdict === 'PASS') passed++;
-        else failed++;
-      } catch (err) {
+        entries.push({ scenarioId: sc.id, run: newRun });
+      } catch (err: any) {
         console.error(`Error running ${sc.id}:`, err);
-        failed++;
+        entries.push({ scenarioId: sc.id, error: err?.message || String(err) });
       }
     }
 
     setRunning(false);
     setActiveExecutionInfo(null);
     setActiveTab('runs');
+    const lastRun = [...entries].reverse().find((e) => e.run)?.run;
+    if (lastRun) setSelectedRun(lastRun);
     refreshApprovals();
+    setSuiteSummary({ policyName, agent, entries });
+
+    const count = (v: string) => entries.filter((e) => e.run?.verdict === v).length;
+    const errors = entries.filter((e) => e.error).length;
     toast.success(
       'Suite Completed',
-      `${passed} PASSED, ${failed} FAILED across ${scenarios.length} scenarios.`
+      `${count('PASS')} PASS, ${count('FAIL')} FAIL, ${count('INCONCLUSIVE')} INCONCLUSIVE` +
+        (errors ? `, ${errors} error(s)` : '') +
+        ` across ${scenarios.length} scenarios.`
     );
   };
 
@@ -276,25 +297,6 @@ function MainApp() {
     }
   };
 
-  // Download Audit Report
-  const handleDownloadReport = async (runId: string) => {
-    try {
-      const markdown = await fetchRunReport(runId);
-      const blob = new Blob([markdown], { type: 'text/markdown;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.setAttribute('download', `containbench-audit-${runId}.md`);
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      URL.revokeObjectURL(url);
-      toast.success('Report Downloaded', `Saved containbench-audit-${runId}.md`);
-    } catch (err: any) {
-      toast.error('Download Failed', err.message || String(err));
-    }
-  };
-
   // Generate Orchestration Stimulus
   const handleGenerateStimulus = async () => {
     setOrchLoading('stimulus');
@@ -332,7 +334,7 @@ function MainApp() {
         vultrStatus={vultrStatus}
         running={running}
         onRunQuickDemo={() => runQuickDemoAB('CB-001')}
-        onRunAllScenarios={handleRunAllSuite}
+        onRunAllScenarios={() => setSuiteDialogOpen(true)}
         pendingApprovalsCount={pendingApprovalsCount}
         onNavigateToApprovals={() => {
           setActiveTab('approvals');
@@ -364,7 +366,7 @@ function MainApp() {
               setSelectedPolicyId('hardened');
             }}
             onRunQuickAB={runQuickDemoAB}
-            onRunAll={handleRunAllSuite}
+            onRunAll={() => setSuiteDialogOpen(true)}
             running={running}
           />
         )}
@@ -383,7 +385,7 @@ function MainApp() {
               {selectedRun ? (
                 <RunDetailView
                   run={selectedRun}
-                  onDownloadReport={handleDownloadReport}
+                  onOpenReport={setReportRunId}
                 />
               ) : (
                 <div className="p-12 text-center rounded-2xl bg-slate-900 border border-slate-800 text-slate-400">
@@ -460,6 +462,39 @@ function MainApp() {
         onClose={() => setModalScenario(null)}
         onLaunch={handleLaunchTest}
       />
+
+      {/* Configure & Run Complete Suite */}
+      <SuiteRunModal
+        open={suiteDialogOpen}
+        scenarioCount={scenarios.length}
+        policies={policies}
+        policyId={suitePolicyId}
+        setPolicyId={setSuitePolicyId}
+        agentEndpoint={suiteAgent}
+        setAgentEndpoint={setSuiteAgent}
+        llmAgentLabel={llmAgentLabel}
+        llmAgentModel={llmAgent?.model}
+        llmAgentModels={llmAgent?.models}
+        running={running}
+        onClose={closeSuiteDialog}
+        onLaunch={handleRunAllSuite}
+      />
+
+      {/* Suite report: one row per scenario */}
+      <SuiteSummaryModal
+        summary={suiteSummary}
+        onClose={closeSuiteSummary}
+        onOpenRun={(run) => {
+          setSelectedRun(run);
+          setActiveTab('runs');
+          setSuiteSummary(null);
+        }}
+        onOpenReport={setReportRunId}
+        covered={reportRunId !== null}
+      />
+
+      {/* Audit report of one run (stacks above the suite report) */}
+      <ReportModal runId={reportRunId} onClose={closeReport} />
 
       {/* Live Stepper Execution Modal */}
       <LiveExecutionModal
