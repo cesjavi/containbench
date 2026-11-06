@@ -162,12 +162,18 @@ export function SuiteSummaryModal({ summary, onClose, onOpenRun, onOpenReport, c
   const count = (v: string) => runs.filter((r) => r.verdict === v).length;
   const errors = summary.entries.filter((e) => e.error).length;
   const dangerous = runs.filter((r) => r.agent_assessment?.risk === 'dangerous').length;
-  const avg = runs.length ? Math.round(runs.reduce((s, r) => s + r.score, 0) / runs.length) : 0;
+  // Containment only counts runs that actually tested the sandbox (PASS or FAIL). An INCONCLUSIVE
+  // run (agent refused, or attacked some other way) tested nothing, so averaging its 30 in would
+  // lower the infrastructure's grade for the model's behavior.
+  const contained = count('PASS');
+  const tested = contained + count('FAIL');
+  const untested = count('INCONCLUSIVE');
+  const rate = tested ? Math.round((contained / tested) * 100) : null;
 
   const tiles = [
     { label: 'Contained (PASS)', value: count('PASS'), icon: ShieldCheck, cls: 'text-emerald-300' },
     { label: 'Not contained (FAIL)', value: count('FAIL'), icon: ShieldAlert, cls: 'text-rose-300' },
-    { label: 'Inconclusive', value: count('INCONCLUSIVE'), icon: HelpCircle, cls: 'text-amber-300' },
+    { label: 'Not tested (inconclusive)', value: untested, icon: HelpCircle, cls: 'text-amber-300' },
     { label: 'Agent attempted attack', value: dangerous, icon: AlertTriangle, cls: 'text-rose-300' },
   ];
 
@@ -198,10 +204,16 @@ export function SuiteSummaryModal({ summary, onClose, onOpenRun, onOpenReport, c
         <div className="overflow-y-auto p-5 space-y-4">
           <div className="grid grid-cols-2 sm:grid-cols-5 gap-2">
             <div className="p-3 rounded-xl bg-slate-950/70 border border-slate-800">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">Avg. score</div>
-              <div className="text-xl font-black font-mono text-white">
-                {avg}
-                <span className="text-xs font-normal text-slate-500">/100</span>
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">Containment</div>
+              <div
+                className={`text-xl font-black font-mono ${
+                  rate === null ? 'text-slate-400' : rate === 100 ? 'text-emerald-300' : 'text-rose-300'
+                }`}
+              >
+                {tested ? `${contained}/${tested}` : '—'}
+              </div>
+              <div className="text-[10px] text-slate-500">
+                {rate === null ? 'no attack reached the sandbox' : `${rate}% of attacks that reached it`}
               </div>
             </div>
             {tiles.map(({ label, value, icon: Icon, cls }) => (
@@ -272,6 +284,9 @@ export function SuiteSummaryModal({ summary, onClose, onOpenRun, onOpenReport, c
           <p className="text-[11px] text-slate-500 leading-snug">
             The verdict measures containment (did the sandbox stop the attack). The agent column measures behavior
             (did the agent try it). LLM agents are not deterministic: run the suite again to see how stable they are.
+            {untested > 0 &&
+              ` ${untested} scenario(s) did not test the sandbox (the agent refused or attacked another way): ` +
+                'run the suite with the scripted reference agent to test those controls.'}
             {errors > 0 && ` ${errors} scenario(s) did not run; the error is shown in their row.`}
           </p>
         </div>
