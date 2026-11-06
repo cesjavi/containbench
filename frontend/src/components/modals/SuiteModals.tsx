@@ -4,6 +4,7 @@ import { PolicyConfig, RunResult } from '../../types';
 import type { AgentModel } from '../../api';
 import { AgentPicker } from './AgentPicker';
 import { AgentRiskBadge } from '../runs/AgentRiskBadge';
+import { CrashDummy } from '../ui/CrashDummy';
 
 function useEscape(open: boolean, onClose: () => void) {
   useEffect(() => {
@@ -186,6 +187,12 @@ export function SuiteSummaryModal({ summary, onClose, onOpenRun, onOpenReport, c
         className="bg-slate-900 border border-slate-800 rounded-2xl max-w-3xl w-full max-h-[90vh] flex flex-col shadow-2xl"
       >
         <div className="flex items-start justify-between px-5 py-3 border-b border-slate-800">
+          <div className="flex items-center gap-3">
+          <CrashDummy
+            mood={count('FAIL') > 0 ? 'breached' : tested > 0 ? 'contained' : 'unsure'}
+            size={52}
+            title={count('FAIL') > 0 ? 'An attack got through' : tested > 0 ? 'Every attack was contained' : 'No attack reached the sandbox'}
+          />
           <div>
             <h3 className="text-base font-bold text-white flex items-center gap-2">
               <Layers className="h-4 w-4 text-teal-400" />
@@ -195,6 +202,7 @@ export function SuiteSummaryModal({ summary, onClose, onOpenRun, onOpenReport, c
               Policy <span className="text-teal-300 font-semibold">{summary.policyName}</span> · Agent{' '}
               <span className="font-mono text-slate-200">{summary.agent}</span>
             </p>
+          </div>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-slate-200 p-1" aria-label="Close">
             <X className="h-4 w-4" />

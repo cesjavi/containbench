@@ -6,6 +6,16 @@ export default {
   ],
   theme: {
     extend: {
+      keyframes: {
+        'dummy-bob': {
+          '0%, 100%': { transform: 'translateY(0) rotate(0deg)' },
+          '25%': { transform: 'translateY(-3px) rotate(-3deg)' },
+          '75%': { transform: 'translateY(-3px) rotate(3deg)' },
+        },
+      },
+      animation: {
+        'dummy-bob': 'dummy-bob 1.4s ease-in-out infinite',
+      },
       colors: {
         brand: {
           50: '#f0fdfa',

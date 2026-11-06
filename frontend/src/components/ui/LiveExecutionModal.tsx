@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
-import { Shield, RotateCw, CheckCircle2, Terminal, AlertTriangle } from 'lucide-react';
+import { CrashDummy } from './CrashDummy';
+import { RotateCw, CheckCircle2, Terminal, AlertTriangle } from 'lucide-react';
 
 export interface ExecutionStep {
   title: string;
@@ -74,9 +75,7 @@ export function LiveExecutionModal({
         {/* Header */}
         <div className="flex items-center justify-between border-b border-slate-800 pb-4">
           <div className="flex items-center gap-3">
-            <div className="h-10 w-10 rounded-xl bg-gradient-to-tr from-teal-500 to-cyan-400 flex items-center justify-center shadow-md shadow-teal-500/20">
-              <Shield className="h-5 w-5 text-slate-950 stroke-[2.5]" />
-            </div>
+            <CrashDummy mood="testing" size={46} className="animate-dummy-bob shrink-0" />
             <div>
               <h3 className="text-base font-bold text-white flex items-center gap-2">
                 {customTitle || `Crash Testing: ${scenarioId || 'Suite'}`}

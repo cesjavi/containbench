@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { CrashDummy } from './CrashDummy';
 import { Shield, Server, Terminal, Cpu, CheckCircle2, RotateCw, Sparkles, ChevronRight } from 'lucide-react';
 
 interface SplashScreenProps {
@@ -101,14 +102,18 @@ export function SplashScreen({
 
       {/* Main Center Content */}
       <div className="relative z-10 flex flex-col items-center max-w-lg w-full px-6 text-center">
-        {/* Animated Glowing Shield Logo */}
+        {/* Mascot with ambient glow */}
         <div className="relative mb-6 group">
           {/* Ambient Glow */}
           <div className="absolute -inset-3 bg-gradient-to-r from-teal-500/30 via-cyan-400/30 to-blue-500/30 rounded-3xl blur-xl opacity-75 group-hover:opacity-100 transition duration-1000 animate-pulse" />
 
-          {/* Icon Box */}
-          <div className="relative h-20 w-20 rounded-2xl bg-gradient-to-tr from-teal-500 via-cyan-400 to-blue-500 flex items-center justify-center shadow-2xl shadow-teal-500/40 border border-teal-300/30">
-            <Shield className="h-11 w-11 text-slate-950 stroke-[2.5]" />
+          {/* Mascot: the crash-test dummy, buckled in once the system is ready */}
+          <div className="relative">
+            <CrashDummy
+              mood={stepIndex >= SPLASH_STEPS.length - 1 ? 'contained' : 'testing'}
+              size={104}
+              className={stepIndex >= SPLASH_STEPS.length - 1 ? '' : 'animate-dummy-bob'}
+            />
           </div>
 
           {/* Sub badge */}

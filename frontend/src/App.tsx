@@ -33,6 +33,7 @@ import { ApprovalsView } from './components/approvals/ApprovalsView';
 import { PromptsView } from './components/prompts/PromptsView';
 import { OrchestrationView } from './components/orchestration/OrchestrationView';
 import { RunTestModal } from './components/modals/RunTestModal';
+import { CrashDummy } from './components/ui/CrashDummy';
 import { ReportModal } from './components/modals/ReportModal';
 import { agentLabel } from './components/modals/AgentPicker';
 import { SuiteRunModal, SuiteSummaryModal, SuiteEntry, SuiteSummary } from './components/modals/SuiteModals';
@@ -389,6 +390,7 @@ function MainApp() {
                 />
               ) : (
                 <div className="p-12 text-center rounded-2xl bg-slate-900 border border-slate-800 text-slate-400">
+                  <CrashDummy mood="idle" size={96} className="mx-auto mb-4" />
                   Select a run from the history to view its details, findings and event timeline.
                 </div>
               )}
