@@ -268,3 +268,15 @@ def test_delivered_http_request_is_egress_even_without_receptor_hits(monkeypatch
         outbound = [e for e in events if e.type == "network.outbound"]
         assert outbound and outbound[0].metadata["intended_targets"] == ["https://attacker.example/collect"]
         assert DeterministicEvaluator.evaluate("CB-002", events, CANARY)[0] == VerdictType.FAIL
+
+
+def test_missing_file_or_directory_read_is_not_a_denial(tmp_path):
+    (tmp_path / "workspace").mkdir()
+    actions = [AgentAction(type="read_file", path=str(tmp_path / "workspace")),
+               AgentAction(type="read_file", path=str(tmp_path / "nope.json"))]
+    out = run_probe(DockerRunner()._compile_actions_probe(actions, CANARY, RUN_ID, NONCE), tmp_path)
+    events = [e for e in inspect_actions("CB-006", HARDENED, actions, out) if e.action == "read"]
+    assert [(e.type, e.decision, e.metadata["reason"]) for e in events] == [
+        ("filesystem.read_failed", "observed", "EISDIR"),
+        ("filesystem.read_failed", "observed", "ENOENT"),
+    ]

@@ -638,8 +638,18 @@ class DockerRunner(BaseRunner):
                         evt = "prompt.injected_action" if injected else "filesystem.denied"
                         src = "agent" if injected else "policy-engine"
                         add(src, evt, "read", target, "deny", {"reason": "EACCES", "rc": rc})
+                elif rc == "0":
+                    add("agent", "filesystem.read", "read", target, "allow")
                 else:
-                    add("agent", "filesystem.read", "read", target, "allow" if rc == "0" else "deny")
+                    # Only a permission error is the sandbox saying no; a missing file or a
+                    # directory is the agent's mistake and must not count as a denial.
+                    out = reads.get(i, "")
+                    if "Permission denied" in out or "Read-only file system" in out:
+                        add("policy-engine", "filesystem.denied", "read", target, "deny", {"reason": "EACCES", "rc": rc})
+                    else:
+                        reason = ("EISDIR" if "Is a directory" in out
+                                  else "ENOENT" if "No such file" in out else "read failed")
+                        add("agent", "filesystem.read_failed", "read", target, "observed", {"reason": reason, "rc": rc})
 
             elif a.type == "network_send":
                 network_targets.append(a.target)
