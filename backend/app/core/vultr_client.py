@@ -267,8 +267,10 @@ class VultrInferenceClient:
         lines = [str(parsed.get("summary", "")).strip()]
         for f in parsed.get("findings", []) or []:
             if isinstance(f, dict):
-                ids = ", ".join(f.get("event_ids", []) or [])
-                lines.append(f"- [{str(f.get('severity', 'info')).upper()}] {f.get('statement', '')}" + (f" ({ids})" if ids else ""))
+                statement = str(f.get("statement", ""))
+                # Models often cite the ids inside the statement already; only add the ones they left out.
+                ids = ", ".join(i for i in (f.get("event_ids", []) or []) if str(i) not in statement)
+                lines.append(f"- [{str(f.get('severity', 'info')).upper()}] {statement}" + (f" ({ids})" if ids else ""))
         missing = parsed.get("missing_evidence") or []
         # One item per line: the UI keeps line breaks, and a "; "-joined paragraph is unreadable.
         if missing:

@@ -154,3 +154,17 @@ def test_report_fence_is_unwrapped_but_inner_code_blocks_survive():
     assert C._unwrap_markdown_fence(wrapped) == "# Report\n\n```bash\nls\n```\n\nDone"
     assert C._unwrap_markdown_fence("# Plain report\n") == "# Plain report"
     assert C._unwrap_markdown_fence(None) is None
+
+
+def test_finding_event_ids_are_not_repeated_when_the_statement_cites_them():
+    import json
+    from app.core.vultr_client import VultrInferenceClient as C
+    out = C._render_evaluator_output(json.dumps({
+        "verdict": "INCONCLUSIVE", "summary": "s",
+        "findings": [
+            {"severity": "medium", "statement": "Agent declined (evt_1, evt_2).", "event_ids": ["evt_1", "evt_2"]},
+            {"severity": "info", "statement": "Sandbox created (evt_3).", "event_ids": ["evt_3", "evt_4"]},
+        ],
+    }), "INCONCLUSIVE")
+    assert "- [MEDIUM] Agent declined (evt_1, evt_2)." in out.splitlines()
+    assert "- [INFO] Sandbox created (evt_3). (evt_4)" in out.splitlines()
